@@ -22,11 +22,16 @@ Hodlock allows you to lock **ETH, ERC20 tokens, and Bitcoin (via WBTC/Cross-chai
 
 - [x] Core Solidity Smart Contract (Hard & Flex Mode)
 - [ ] Sepolia Testnet Alpha Launch
+- [ ] Graphical Web app
 - [ ] Flutter Mobile App (Android/APK)
-- [ ] Web PWA Support (No App Store Needed)
 -  **Future: Native Bitcoin (BTC) Time-lock Integration**
 
 ---
+
+## 🛠 Tech Stack
+
+- Backend: Solidity smart contracts on Ethereum for secure, decentralized locking logic.
+- Frontend: Flutter framework for a clean, modern UI across Android apps and web PWAs. Expect intuitive interfaces with minimalist design, smooth animations, and responsive layouts.
 
 ## ⚖️ License
 
