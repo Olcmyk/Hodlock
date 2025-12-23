@@ -20,7 +20,7 @@ Hodlock allows you to lock **ETH, ERC20 tokens, and Bitcoin (via WBTC/Cross-chai
 
 ## 🗺 Roadmap
 
-- [x] Core Solidity Smart Contract (Hard & Flex Mode)
+- [ ] Core Solidity Smart Contract (Hard & Flex Mode)
 - [ ] Sepolia Testnet Alpha Launch
 - [ ] Graphical Web app
 - [ ] Flutter Mobile App (Android/APK)
