@@ -33,6 +33,16 @@ contract HodlockNFTRenderer {
     using Strings for uint256;
     using Strings for address;
 
+    struct RenderData {
+        string tokenName;
+        string tokenSymbol;
+        string formattedAmount;
+        string status;
+        string transferable;
+        string imageUrl;
+        uint256 lockDays;
+    }
+
     // IPFS图片CID
     string public constant HOURGLASS_CID = "QmS6GLuBFQANG4YzvyaJyQMu8HpbLvootZ4mMoyFrgohR3";
     string public constant TROPHY_CID = "Qme1FnaaikCdpveyQ6CTrbcxoejtEwCWbmL9b5mBoscfjp";
@@ -50,16 +60,26 @@ contract HodlockNFTRenderer {
         IHodlockNFT.LockInfo memory info = nftContract.getLockInfo(tokenId);
         address owner = nftContract.ownerOf(tokenId);
 
-        // 判断是否已解锁
-        bool unlocked = block.timestamp >= info.unlockTimestamp;
-
-        // 获取代币信息
-        (string memory tokenName, string memory tokenSymbol, uint8 decimals) = _getTokenInfo(info.tokenAddress);
-
-        // 构建JSON
-        string memory json = _buildJson(tokenId, info, owner, unlocked, tokenName, tokenSymbol, decimals);
+        RenderData memory data = _prepareRenderData(info);
+        string memory json = _buildJson(tokenId, info, owner, data);
 
         return string(abi.encodePacked("data:application/json;base64,", Base64.encode(bytes(json))));
+    }
+
+    /// @dev 准备渲染数据
+    function _prepareRenderData(IHodlockNFT.LockInfo memory info) internal view returns (RenderData memory data) {
+        bool unlocked = block.timestamp >= info.unlockTimestamp;
+
+        (data.tokenName, data.tokenSymbol, ) = _getTokenInfo(info.tokenAddress);
+        (, , uint8 decimals) = _getTokenInfo(info.tokenAddress);
+
+        data.formattedAmount = _formatAmount(info.amount, decimals);
+        data.status = unlocked ? "Unlocked" : "Locked";
+        data.transferable = unlocked ? "true" : "false";
+        data.imageUrl = unlocked
+            ? string(abi.encodePacked("ipfs://", TROPHY_CID))
+            : string(abi.encodePacked("ipfs://", HOURGLASS_CID));
+        data.lockDays = (info.unlockTimestamp - info.depositTimestamp) / 1 days;
     }
 
     /// @dev 构建完整的JSON元数据
@@ -67,37 +87,20 @@ contract HodlockNFTRenderer {
         uint256 tokenId,
         IHodlockNFT.LockInfo memory info,
         address owner,
-        bool unlocked,
-        string memory tokenName,
-        string memory tokenSymbol,
-        uint8 decimals
+        RenderData memory data
     ) internal pure returns (string memory) {
-        string memory imageUrl = unlocked
-            ? string(abi.encodePacked("ipfs://", TROPHY_CID))
-            : string(abi.encodePacked("ipfs://", HOURGLASS_CID));
-
-        string memory status = unlocked ? "Unlocked" : "Locked";
-        string memory transferable = unlocked ? "true" : "false";
-
-        // 格式化金额
-        string memory formattedAmount = _formatAmount(info.amount, decimals);
-
-        // 计算锁仓天数
-        uint256 lockDays = (info.unlockTimestamp - info.depositTimestamp) / 1 days;
-
-        // 构建动态描述
         string memory description = string(abi.encodePacked(
             "A certificate representing a locked token deposit in Hodlock protocol. ",
-            "This NFT represents ", formattedAmount, " ", tokenSymbol,
-            " locked for ", lockDays.toString(), " days."
+            "This NFT represents ", data.formattedAmount, " ", data.tokenSymbol,
+            " locked for ", data.lockDays.toString(), " days."
         ));
 
         return string(abi.encodePacked(
             '{"name":"Hodlock Certificate #', tokenId.toString(), '",',
             '"description":"', description, '",',
-            '"image":"', imageUrl, '",',
+            '"image":"', data.imageUrl, '",',
             '"external_url":"https://hodlock.io",',
-            _buildAttributes(info, owner, status, transferable, tokenName, tokenSymbol, formattedAmount),
+            _buildAttributes(info, owner, data),
             '}'
         ));
     }
@@ -106,20 +109,16 @@ contract HodlockNFTRenderer {
     function _buildAttributes(
         IHodlockNFT.LockInfo memory info,
         address owner,
-        string memory status,
-        string memory transferable,
-        string memory tokenName,
-        string memory tokenSymbol,
-        string memory formattedAmount
+        RenderData memory data
     ) internal pure returns (string memory) {
         return string(abi.encodePacked(
             '"attributes":[',
-            '{"trait_type":"Status","value":"', status, '"},',
-            '{"trait_type":"Transferable","value":"', transferable, '"},',
-            '{"trait_type":"Token","value":"', tokenSymbol, '"},',
-            '{"trait_type":"Token Name","value":"', tokenName, '"},',
+            '{"trait_type":"Status","value":"', data.status, '"},',
+            '{"trait_type":"Transferable","value":"', data.transferable, '"},',
+            '{"trait_type":"Token","value":"', data.tokenSymbol, '"},',
+            '{"trait_type":"Token Name","value":"', data.tokenName, '"},',
             '{"trait_type":"Token Address","value":"', _addressToString(info.tokenAddress), '"},',
-            _buildAttributesPart2(info, owner, formattedAmount),
+            _buildAttributesPart2(info, owner, data.formattedAmount),
             ']'
         ));
     }
