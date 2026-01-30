@@ -82,9 +82,19 @@ contract HodlockNFTRenderer {
         // 格式化金额
         string memory formattedAmount = _formatAmount(info.amount, decimals);
 
+        // 计算锁仓天数
+        uint256 lockDays = (info.unlockTimestamp - info.depositTimestamp) / 1 days;
+
+        // 构建动态描述
+        string memory description = string(abi.encodePacked(
+            "A certificate representing a locked token deposit in Hodlock protocol. ",
+            "This NFT represents ", formattedAmount, " ", tokenSymbol,
+            " locked for ", lockDays.toString(), " days."
+        ));
+
         return string(abi.encodePacked(
             '{"name":"Hodlock Certificate #', tokenId.toString(), '",',
-            '"description":"A certificate representing a locked token deposit in Hodlock protocol.",',
+            '"description":"', description, '",',
             '"image":"', imageUrl, '",',
             '"external_url":"https://hodlock.io",',
             _buildAttributes(info, owner, status, transferable, tokenName, tokenSymbol, formattedAmount),
