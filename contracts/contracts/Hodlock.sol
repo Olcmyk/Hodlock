@@ -5,7 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
 interface IHodlockNFT {
     function mint(
@@ -20,7 +19,7 @@ interface IHodlockNFT {
     function burn(address holder, uint256 depositId) external;
 }
 
-contract Hodlock is Ownable, ReentrancyGuard, Pausable {
+contract Hodlock is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ==========================
@@ -43,6 +42,9 @@ contract Hodlock is Ownable, ReentrancyGuard, Pausable {
     uint256 public constant MAX_DEV_FEE_BPS = 1000; // 0-10%
     uint256 public constant MAX_REFERRER_FEE_BPS = 3000; // 0-30%
 
+    // 时间锁延迟（用于费用参数修改）
+    uint256 public constant TIMELOCK_DELAY = 2 days;
+
     // ==========================
     // 全局状态
     // ==========================
@@ -54,6 +56,15 @@ contract Hodlock is Ownable, ReentrancyGuard, Pausable {
     // Owner 可调参数（bps，基数 10000）
     uint256 public devFeeBps = 1000; // 开发者费用比例 (0-10%)
     uint256 public referrerFeeBps = 3000; // 邀请人费用比例 (0-30%)
+
+    // 待处理的费用更改（时间锁）
+    struct PendingFeeChange {
+        uint256 newValue;
+        uint256 executeTime;
+        bool pending;
+    }
+    PendingFeeChange public pendingDevFeeBps;
+    PendingFeeChange public pendingReferrerFeeBps;
 
     // 开发者相关
     address public developer; // 开发者地址（资金接收方）
@@ -130,6 +141,12 @@ contract Hodlock is Ownable, ReentrancyGuard, Pausable {
     event ReferrerFeeBpsUpdated(uint256 newBps);
     event DeveloperUpdated(address indexed newDeveloper);
 
+    // 时间锁事件
+    event DevFeeBpsProposed(uint256 newBps, uint256 executeTime);
+    event ReferrerFeeBpsProposed(uint256 newBps, uint256 executeTime);
+    event DevFeeBpsCancelled();
+    event ReferrerFeeBpsCancelled();
+
     // ==========================
     // 构造函数
     // ==========================
@@ -153,7 +170,7 @@ contract Hodlock is Ownable, ReentrancyGuard, Pausable {
     /// @param lockSeconds 锁定秒数（最小 300 秒）
     /// @param penaltyBps 罚金比例（500-10000 bps，即 5%-100%）
     /// @param referrer 邀请人地址（仅首次存款生效，可为0）
-    function deposit(uint256 amount, uint256 lockSeconds, uint256 penaltyBps, address referrer) external whenNotPaused {
+    function deposit(uint256 amount, uint256 lockSeconds, uint256 penaltyBps, address referrer) external {
         require(amount > 0, "Amount zero");
         require(lockSeconds >= MIN_LOCK_SECONDS, "Lock too short");
         require(penaltyBps >= MIN_PENALTY_BPS && penaltyBps <= MAX_PENALTY_BPS, "Invalid penalty");
@@ -259,7 +276,7 @@ contract Hodlock is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice 提前取款（产生罚金），按存单操作，全额销号
     /// @param depositId 存单索引
-    function withdrawEarly(uint256 depositId) external nonReentrant whenNotPaused {
+    function withdrawEarly(uint256 depositId) external nonReentrant {
         // ================================
         // 1. CHECKS（检查）
         // ================================
@@ -412,29 +429,54 @@ contract Hodlock is Ownable, ReentrancyGuard, Pausable {
         emit DeveloperUpdated(_developer);
     }
 
-    /// @notice 设置开发者费用比例（0-1000 bps，即 0-10%）
-    function setDevFeeBps(uint256 newBps) external onlyOwner {
+    /// @notice 提议设置开发者费用比例（0-1000 bps，即 0-10%），需等待时间锁后执行
+    function proposeDevFeeBps(uint256 newBps) external onlyOwner {
         require(newBps <= MAX_DEV_FEE_BPS, "DevFee too high");
-        devFeeBps = newBps;
-        emit DevFeeBpsUpdated(newBps);
+        uint256 executeTime = block.timestamp + TIMELOCK_DELAY;
+        pendingDevFeeBps = PendingFeeChange(newBps, executeTime, true);
+        emit DevFeeBpsProposed(newBps, executeTime);
     }
 
-    /// @notice 设置邀请人费用比例（0-3000 bps，即 0-30%）
-    function setReferrerFeeBps(uint256 newBps) external onlyOwner {
+    /// @notice 执行待处理的开发者费用修改
+    function executeDevFeeBps() external onlyOwner {
+        require(pendingDevFeeBps.pending, "No pending change");
+        require(block.timestamp >= pendingDevFeeBps.executeTime, "Timelock active");
+        devFeeBps = pendingDevFeeBps.newValue;
+        pendingDevFeeBps.pending = false;
+        emit DevFeeBpsUpdated(pendingDevFeeBps.newValue);
+    }
+
+    /// @notice 取消待处理的开发者费用修改
+    function cancelDevFeeBps() external onlyOwner {
+        require(pendingDevFeeBps.pending, "No pending change");
+        pendingDevFeeBps.pending = false;
+        emit DevFeeBpsCancelled();
+    }
+
+    /// @notice 提议设置邀请人费用比例（0-3000 bps，即 0-30%），需等待时间锁后执行
+    function proposeReferrerFeeBps(uint256 newBps) external onlyOwner {
         require(newBps <= MAX_REFERRER_FEE_BPS, "RefFee too high");
-        referrerFeeBps = newBps;
-        emit ReferrerFeeBpsUpdated(newBps);
+        uint256 executeTime = block.timestamp + TIMELOCK_DELAY;
+        pendingReferrerFeeBps = PendingFeeChange(newBps, executeTime, true);
+        emit ReferrerFeeBpsProposed(newBps, executeTime);
     }
 
-    /// @notice 紧急暂停合约
-    function pause() external onlyOwner {
-        _pause();
+    /// @notice 执行待处理的邀请人费用修改
+    function executeReferrerFeeBps() external onlyOwner {
+        require(pendingReferrerFeeBps.pending, "No pending change");
+        require(block.timestamp >= pendingReferrerFeeBps.executeTime, "Timelock active");
+        referrerFeeBps = pendingReferrerFeeBps.newValue;
+        pendingReferrerFeeBps.pending = false;
+        emit ReferrerFeeBpsUpdated(pendingReferrerFeeBps.newValue);
     }
 
-    /// @notice 恢复合约运行
-    function unpause() external onlyOwner {
-        _unpause();
+    /// @notice 取消待处理的邀请人费用修改
+    function cancelReferrerFeeBps() external onlyOwner {
+        require(pendingReferrerFeeBps.pending, "No pending change");
+        pendingReferrerFeeBps.pending = false;
+        emit ReferrerFeeBpsCancelled();
     }
+
 
     // ==========================
     // 视图函数
@@ -464,7 +506,6 @@ contract Hodlock is Ownable, ReentrancyGuard, Pausable {
     function _calculateShare(uint256 amount, uint256 lockSeconds) internal pure returns (uint256) {
         uint256 t2 = lockSeconds * lockSeconds;
         uint256 denom = lockSeconds + SECONDS_PER_YEAR;
-        if (denom == 0) return 0;
         return (amount * t2) / denom;
     }
 
