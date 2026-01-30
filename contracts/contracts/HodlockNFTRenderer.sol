@@ -13,7 +13,7 @@ interface IHodlockNFT {
         uint256 depositTimestamp;
         uint256 unlockTimestamp;
         uint256 penaltyBps;
-        bool isUnlocked;
+        address originalOwner;
         bool isBurned;
     }
 
@@ -51,7 +51,7 @@ contract HodlockNFTRenderer {
         address owner = nftContract.ownerOf(tokenId);
 
         // 判断是否已解锁
-        bool unlocked = info.isUnlocked || block.timestamp >= info.unlockTimestamp;
+        bool unlocked = block.timestamp >= info.unlockTimestamp;
 
         // 获取代币信息
         (string memory tokenName, string memory tokenSymbol, uint8 decimals) = _getTokenInfo(info.tokenAddress);
@@ -134,7 +134,7 @@ contract HodlockNFTRenderer {
             '{"trait_type":"Amount","value":"', formattedAmount, '"},',
             '{"display_type":"date","trait_type":"Deposit Time","value":', info.depositTimestamp.toString(), '},',
             '{"display_type":"date","trait_type":"Unlock Time","value":', info.unlockTimestamp.toString(), '},',
-            '{"trait_type":"Penalty Rate","value":"', (info.penaltyBps / 100).toString(), '%"},',
+            '{"trait_type":"Penalty Rate","value":"', _formatPenalty(info.penaltyBps), '"},',
             '{"trait_type":"Hodlock Contract","value":"', _addressToString(info.hodlockContract), '"},',
             '{"trait_type":"Deposit ID","value":"', info.depositId.toString(), '"},',
             '{"trait_type":"Owner","value":"', _addressToString(owner), '"}'
@@ -196,5 +196,26 @@ contract HodlockNFTRenderer {
     /// @dev 地址转字符串
     function _addressToString(address addr) internal pure returns (string memory) {
         return Strings.toHexString(uint160(addr), 20);
+    }
+
+    /// @dev 格式化罚金比例 (bps to percentage string)
+    function _formatPenalty(uint256 penaltyBps) internal pure returns (string memory) {
+        uint256 integerPart = penaltyBps / 100;
+        uint256 fractionalPart = penaltyBps % 100;
+
+        if (fractionalPart == 0) {
+            return string(abi.encodePacked(integerPart.toString(), "%"));
+        }
+
+        string memory fractionalStr = fractionalPart < 10
+            ? string(abi.encodePacked("0", fractionalPart.toString()))
+            : fractionalPart.toString();
+
+        // 移除尾部0
+        if (fractionalPart % 10 == 0) {
+            fractionalStr = (fractionalPart / 10).toString();
+        }
+
+        return string(abi.encodePacked(integerPart.toString(), ".", fractionalStr, "%"));
     }
 }

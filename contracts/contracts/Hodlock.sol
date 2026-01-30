@@ -2,8 +2,10 @@
 pragma solidity ^0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
 interface IHodlockNFT {
     function mint(
@@ -15,11 +17,12 @@ interface IHodlockNFT {
         uint256 unlockTimestamp,
         uint256 penaltyBps
     ) external returns (uint256 tokenId);
-    function markUnlocked(address holder, uint256 depositId) external;
     function burn(address holder, uint256 depositId) external;
 }
 
-contract Hodlock is Ownable, ReentrancyGuard {
+contract Hodlock is Ownable, ReentrancyGuard, Pausable {
+    using SafeERC20 for IERC20;
+
     // ==========================
     // 常量与基础配置
     // ==========================
@@ -46,6 +49,7 @@ contract Hodlock is Ownable, ReentrancyGuard {
 
     uint256 public totalShare; // 所有用户总份额
     uint256 public accTokenPerShare; // 累计每股奖励（× PRECISION）
+    uint256 public accumulatedRemainder; // 累积的舍入余数（防止精度丢失）
 
     // Owner 可调参数（bps，基数 10000）
     uint256 public devFeeBps = 1000; // 开发者费用比例 (0-10%)
@@ -85,8 +89,6 @@ contract Hodlock is Ownable, ReentrancyGuard {
     // 邀请人累积佣金（由提前取款罚金产生）
     mapping(address => uint256) public referrerRewards;
 
-    // 邀请人的被邀请人列表，仅用于前端展示，不参与核心计算
-    mapping(address => address[]) public referrals;
 
     // ==========================
     // 事件定义
@@ -100,7 +102,7 @@ contract Hodlock is Ownable, ReentrancyGuard {
         uint256 lockSeconds,
         uint256 penaltyBps,
         uint256 unlockTimestamp,
-        address referrer
+        address indexed referrer
     );
     event WithdrawEarly(address indexed user, uint256 indexed depositId, uint256 amount, uint256 penalty, uint256 forfeitedReward);
     event Withdraw(address indexed user, uint256 indexed depositId, uint256 amount, uint256 reward);
@@ -151,7 +153,7 @@ contract Hodlock is Ownable, ReentrancyGuard {
     /// @param lockSeconds 锁定秒数（最小 300 秒）
     /// @param penaltyBps 罚金比例（500-10000 bps，即 5%-100%）
     /// @param referrer 邀请人地址（仅首次存款生效，可为0）
-    function deposit(uint256 amount, uint256 lockSeconds, uint256 penaltyBps, address referrer) external {
+    function deposit(uint256 amount, uint256 lockSeconds, uint256 penaltyBps, address referrer) external whenNotPaused {
         require(amount > 0, "Amount zero");
         require(lockSeconds >= MIN_LOCK_SECONDS, "Lock too short");
         require(penaltyBps >= MIN_PENALTY_BPS && penaltyBps <= MAX_PENALTY_BPS, "Invalid penalty");
@@ -160,7 +162,7 @@ contract Hodlock is Ownable, ReentrancyGuard {
         uint256 balanceBefore = token.balanceOf(address(this));
 
         // 代币转入合约
-        require(token.transferFrom(msg.sender, address(this), amount), "TransferFrom fail");
+        token.safeTransferFrom(msg.sender, address(this), amount);
 
         // 计算实际到账金额
         uint256 actualAmount = token.balanceOf(address(this)) - balanceBefore;
@@ -241,13 +243,15 @@ contract Hodlock is Ownable, ReentrancyGuard {
         info.rewardDebt = 0;
         info.withdrawn = true;
 
-        // 标记NFT为已解锁（如果已铸造NFT）
-        if (hasNFT[msg.sender][depositId]) {
-            nftContract.markUnlocked(msg.sender, depositId);
-        }
-
         // 转账（支持 fee-on-transfer tokens）
         uint256 transferAmount = amount + pending;
+
+        // 如果是最后一个用户，将累积的余数作为奖励给他
+        if (totalShare == 0 && accumulatedRemainder > 0) {
+            transferAmount += accumulatedRemainder / PRECISION;
+            accumulatedRemainder = 0;
+        }
+
         _safeTransfer(msg.sender, transferAmount);
 
         emit Withdraw(msg.sender, depositId, amount, pending);
@@ -255,18 +259,29 @@ contract Hodlock is Ownable, ReentrancyGuard {
 
     /// @notice 提前取款（产生罚金），按存单操作，全额销号
     /// @param depositId 存单索引
-    function withdrawEarly(uint256 depositId) external nonReentrant {
+    function withdrawEarly(uint256 depositId) external nonReentrant whenNotPaused {
+        // ================================
+        // 1. CHECKS（检查）
+        // ================================
         DepositInfo storage info = _getActiveDeposit(msg.sender, depositId);
         require(info.amount > 0, "No amount");
+
+        // 记录是否需要销毁 NFT（不调用外部合约）
+        bool shouldBurnNFT = hasNFT[msg.sender][depositId];
+
+        // ================================
+        // 2. EFFECTS（状态更新）
+        // ================================
 
         // 计算用户放弃的待领分红（死钱）
         uint256 forfeitedReward = _pendingReward(info);
 
         uint256 amount = info.amount;
         uint256 share = info.share;
+        uint256 penaltyBps = info.penaltyBps;
 
         // 计算罚金（基于本金，使用存单自己的罚金比例，bps）
-        uint256 penalty = (amount * info.penaltyBps) / 10000;
+        uint256 penalty = (amount * penaltyBps) / 10000;
         require(penalty > 0, "Penalty zero");
 
         // 更新全局份额（彻底剔除该存单份额，避免僵尸份额）
@@ -288,6 +303,11 @@ contract Hodlock is Ownable, ReentrancyGuard {
         if (isLastUser) {
             // 最后一个用户违约，全部罚金 + 死钱给开发者
             toDev = penalty + forfeitedReward;
+            // 累积的余数也给开发者
+            if (accumulatedRemainder > 0) {
+                toDev += accumulatedRemainder / PRECISION;
+                accumulatedRemainder = 0;
+            }
             devBalance += toDev;
         } else {
             // 仍有其他用户
@@ -311,23 +331,30 @@ contract Hodlock is Ownable, ReentrancyGuard {
             rewardToPool += forfeitedReward;
 
             if (rewardToPool > 0 && totalShare > 0) {
-                accTokenPerShare += (rewardToPool * PRECISION) / totalShare;
+                uint256 numerator = rewardToPool * PRECISION + accumulatedRemainder;
+                uint256 toAdd = numerator / totalShare;
+                accumulatedRemainder = numerator % totalShare;
+                accTokenPerShare += toAdd;
             }
         }
 
-        // Dune 分析事件：追踪资金流向
-        emit RewardPoolUpdated(penalty, forfeitedReward, rewardToPool, toReferrer, toDev);
-
-        // 实际转给用户的数量 = amount - penalty
         uint256 transferAmount = amount - penalty;
-        _safeTransfer(msg.sender, transferAmount);
 
-        // 销毁NFT（如果已铸造NFT）
-        if (hasNFT[msg.sender][depositId]) {
+        // ================================
+        // 3. INTERACTIONS（外部交互）
+        // ================================
+
+        // 发出事件
+        emit RewardPoolUpdated(penalty, forfeitedReward, rewardToPool, toReferrer, toDev);
+        emit WithdrawEarly(msg.sender, depositId, amount, penalty, forfeitedReward);
+
+        // 销毁 NFT（外部调用）
+        if (shouldBurnNFT) {
             nftContract.burn(msg.sender, depositId);
         }
 
-        emit WithdrawEarly(msg.sender, depositId, amount, penalty, forfeitedReward);
+        // 转账（外部调用）
+        _safeTransfer(msg.sender, transferAmount);
     }
 
     /// @notice 单独领取某一存单的奖励（不改变质押本金）
@@ -399,6 +426,16 @@ contract Hodlock is Ownable, ReentrancyGuard {
         emit ReferrerFeeBpsUpdated(newBps);
     }
 
+    /// @notice 紧急暂停合约
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice 恢复合约运行
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     // ==========================
     // 视图函数
     // ==========================
@@ -443,17 +480,6 @@ contract Hodlock is Ownable, ReentrancyGuard {
         return accumulated - info.rewardDebt;
     }
 
-    /// @dev 内部结算某存单奖励，并立刻转账
-    function _harvest(address _userAddr, DepositInfo storage info, uint256 depositId) internal returns (uint256) {
-        uint256 pending = _pendingReward(info);
-        if (pending > 0) {
-            info.rewardDebt = (info.share * accTokenPerShare) / PRECISION;
-            _safeTransfer(_userAddr, pending);
-            emit ClaimReward(_userAddr, depositId, pending);
-        }
-        return pending;
-    }
-
     /// @dev 获取用户的有效存单（存储版），带基本检查
     function _getActiveDeposit(address user, uint256 depositId) internal view returns (DepositInfo storage) {
         require(depositId < userDeposits[user].length, "Invalid id");
@@ -480,7 +506,6 @@ contract Hodlock is Ownable, ReentrancyGuard {
         // 首次存款，设置邀请人
         if (referrer != address(0) && referrer != user) {
             userReferrer[user] = referrer;
-            referrals[referrer].push(user);
             emit ReferrerSet(user, referrer);
             return referrer;
         }
@@ -491,6 +516,6 @@ contract Hodlock is Ownable, ReentrancyGuard {
 
     /// @dev 安全转账函数（支持 fee-on-transfer tokens）
     function _safeTransfer(address to, uint256 amount) internal {
-        require(token.transfer(to, amount), "Transfer fail");
+        token.safeTransfer(to, amount);
     }
 }
