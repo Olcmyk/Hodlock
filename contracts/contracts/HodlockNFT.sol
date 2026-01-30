@@ -28,7 +28,7 @@ contract HodlockNFT is ERC721, Ownable {
         uint256 depositTimestamp; // 存入时间
         uint256 unlockTimestamp;  // 解锁时间
         uint256 penaltyBps;       // 罚金比例
-        bool isUnlocked;          // 是否已解锁（时间到期或正常提取）
+        address originalOwner;    // 原始持有者（用于清理映射）
         bool isBurned;            // 是否已销毁
     }
 
@@ -47,6 +47,9 @@ contract HodlockNFT is ERC721, Ownable {
     /// @notice (hodlockContract, user, depositId) => tokenId 的映射
     mapping(address => mapping(address => mapping(uint256 => uint256))) public depositToTokenId;
 
+    /// @dev 内部标记：Hodlock合约正在执行burn操作（用于绕过时间检查）
+    bool private _hodlockBurning;
+
     // ==========================
     // 事件定义
     // ==========================
@@ -54,7 +57,6 @@ contract HodlockNFT is ERC721, Ownable {
     event FactoryUpdated(address indexed newFactory);
     event RendererUpdated(address indexed newRenderer);
     event LockNFTMinted(uint256 indexed tokenId, address indexed holder, address indexed hodlock, uint256 depositId);
-    event LockNFTUnlocked(uint256 indexed tokenId);
     event LockNFTBurned(uint256 indexed tokenId);
 
     // ==========================
@@ -117,7 +119,7 @@ contract HodlockNFT is ERC721, Ownable {
             depositTimestamp: depositTimestamp,
             unlockTimestamp: unlockTimestamp,
             penaltyBps: penaltyBps,
-            isUnlocked: false,
+            originalOwner: to,
             isBurned: false
         });
 
@@ -128,24 +130,38 @@ contract HodlockNFT is ERC721, Ownable {
         emit LockNFTMinted(tokenId, to, msg.sender, depositId);
     }
 
-    /// @notice 标记NFT为已解锁（正常提取后调用）
-    function markUnlocked(address holder, uint256 depositId) external onlyAuthorizedHodlock {
-        uint256 tokenId = depositToTokenId[msg.sender][holder][depositId];
-        require(tokenId != 0, "Token not found");
-        require(!lockInfos[tokenId].isBurned, "Already burned");
+    /// @notice 用户销毁自己的NFT（时间到期后可调用）
+    function burnByHolder(uint256 tokenId) external {
+        require(_ownerOf(tokenId) == msg.sender, "Not owner");
+        require(block.timestamp >= lockInfos[tokenId].unlockTimestamp, "Not expired");
 
-        lockInfos[tokenId].isUnlocked = true;
-        emit LockNFTUnlocked(tokenId);
+        // 获取锁仓信息以清理映射
+        LockInfo storage info = lockInfos[tokenId];
+
+        // 清理 depositToTokenId 映射
+        delete depositToTokenId[info.hodlockContract][info.originalOwner][info.depositId];
+
+        info.isBurned = true;
+        _burn(tokenId);
+
+        emit LockNFTBurned(tokenId);
     }
 
-    /// @notice 销毁NFT（提前取款时调用）
+    /// @notice 销毁NFT（提前取款时调用，可绕过时间检查）
     function burn(address holder, uint256 depositId) external onlyAuthorizedHodlock {
         uint256 tokenId = depositToTokenId[msg.sender][holder][depositId];
         require(tokenId != 0, "Token not found");
         require(!lockInfos[tokenId].isBurned, "Already burned");
 
         lockInfos[tokenId].isBurned = true;
+
+        // 清理映射
+        delete depositToTokenId[msg.sender][holder][depositId];
+
+        // 设置标记，允许绕过时间检查
+        _hodlockBurning = true;
         _burn(tokenId);
+        _hodlockBurning = false;
 
         emit LockNFTBurned(tokenId);
     }
@@ -157,6 +173,7 @@ contract HodlockNFT is ERC721, Ownable {
     /// @notice 获取tokenURI（委托给Renderer）
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_ownerOf(tokenId) != address(0), "Token not exist");
+        require(!lockInfos[tokenId].isBurned, "Token burned");
         require(address(renderer) != address(0), "Renderer not set");
         return renderer.tokenURI(tokenId);
     }
@@ -169,8 +186,8 @@ contract HodlockNFT is ERC721, Ownable {
     /// @notice 检查NFT是否可转让
     function isTransferable(uint256 tokenId) public view returns (bool) {
         LockInfo storage info = lockInfos[tokenId];
-        // 已解锁或时间已到期则可转让
-        return info.isUnlocked || block.timestamp >= info.unlockTimestamp;
+        // 时间已到期则可转让
+        return block.timestamp >= info.unlockTimestamp;
     }
 
     /// @notice 根据hodlock合约、用户、存单ID获取tokenId
@@ -186,11 +203,18 @@ contract HodlockNFT is ERC721, Ownable {
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = _ownerOf(tokenId);
 
-        // 如果是铸造（from == 0）或销毁（to == 0），允许
-        // 否则检查是否可转让
-        if (from != address(0) && to != address(0)) {
-            require(isTransferable(tokenId), "Locked: not transferable");
+        // 铸造（from == 0）始终允许
+        if (from == address(0)) {
+            return super._update(to, tokenId, auth);
         }
+
+        // 如果是Hodlock合约正在执行burn，允许绕过时间检查
+        if (_hodlockBurning && to == address(0)) {
+            return super._update(to, tokenId, auth);
+        }
+
+        // 销毁（to == 0）或转让（to != 0）都需要检查时间是否到期
+        require(isTransferable(tokenId), "Locked: not transferable or burnable");
 
         return super._update(to, tokenId, auth);
     }
