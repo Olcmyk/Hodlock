@@ -170,7 +170,7 @@ contract Hodlock is Ownable, ReentrancyGuard {
     /// @param lockSeconds 锁定秒数（最小 300 秒）
     /// @param penaltyBps 罚金比例（500-10000 bps，即 5%-100%）
     /// @param referrer 邀请人地址（仅首次存款生效，可为0）
-    function deposit(uint256 amount, uint256 lockSeconds, uint256 penaltyBps, address referrer) external {
+    function deposit(uint256 amount, uint256 lockSeconds, uint256 penaltyBps, address referrer) external nonReentrant {
         require(amount > 0, "Amount zero");
         require(lockSeconds >= MIN_LOCK_SECONDS, "Lock too short");
         require(penaltyBps >= MIN_PENALTY_BPS && penaltyBps <= MAX_PENALTY_BPS, "Invalid penalty");
@@ -282,6 +282,7 @@ contract Hodlock is Ownable, ReentrancyGuard {
         // ================================
         DepositInfo storage info = _getActiveDeposit(msg.sender, depositId);
         require(info.amount > 0, "No amount");
+        require(block.timestamp < info.unlockTimestamp, "Already unlocked, use withdraw()");
 
         // 记录是否需要销毁 NFT（不调用外部合约）
         bool shouldBurnNFT = hasNFT[msg.sender][depositId];
