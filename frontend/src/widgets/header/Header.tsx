@@ -1,45 +1,48 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Lock } from "lucide-react";
-import { cn } from "@/shared/lib/utils";
+import { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Lock, Menu, X } from 'lucide-react';
+import { ConnectButton } from '@/features/wallet';
+import { cn } from '@/shared/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const navItems = [
-  { href: "/lock", label: "Lock" },
-  { href: "/swap", label: "Swap" },
-  { href: "/withdraw", label: "Withdraw" },
-  { href: "/invite", label: "Invite" },
+  { href: '/lock', label: 'Lock' },
+  { href: '/swap', label: 'Swap' },
+  { href: '/withdraw', label: 'Withdraw' },
+  { href: '/invite', label: 'Invite' },
 ];
 
 export function Header() {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-100">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Left side: Logo + Navigation */}
           <div className="flex items-center gap-8">
-            {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">
-              <Lock className="w-7 h-7 text-primary-500 group-hover:text-primary-600 transition-colors" />
-              <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-500 bg-clip-text text-transparent">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-500/25 group-hover:shadow-pink-500/40 transition-shadow">
+                <Lock className="h-5 w-5" />
+              </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent">
                 Hodlock
               </span>
             </Link>
 
-            {/* Navigation */}
             <nav className="hidden md:flex items-center gap-1">
               {navItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+                    'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                     pathname === item.href
-                      ? "bg-primary-50 text-primary-600"
-                      : "text-gray-600 hover:text-primary-600 hover:bg-primary-50/50"
+                      ? 'bg-pink-50 text-pink-600'
+                      : 'text-gray-600 hover:text-pink-600 hover:bg-pink-50/50'
                   )}
                 >
                   {item.label}
@@ -48,12 +51,56 @@ export function Header() {
             </nav>
           </div>
 
-          {/* Right side: Connect Wallet */}
           <div className="flex items-center gap-4">
-            <appkit-button />
+            <div className="hidden sm:block">
+              <ConnectButton />
+            </div>
+
+            <button
+              className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? (
+                <X className="h-6 w-6 text-gray-600" />
+              ) : (
+                <Menu className="h-6 w-6 text-gray-600" />
+              )}
+            </button>
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="md:hidden bg-white border-b border-gray-100"
+          >
+            <div className="px-4 py-4 space-y-2">
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    'block px-4 py-3 rounded-xl text-sm font-medium transition-colors',
+                    pathname === item.href
+                      ? 'bg-pink-50 text-pink-600'
+                      : 'text-gray-600 hover:text-pink-600 hover:bg-pink-50/50'
+                  )}
+                >
+                  {item.label}
+                </Link>
+              ))}
+              <div className="pt-2 sm:hidden">
+                <ConnectButton />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }

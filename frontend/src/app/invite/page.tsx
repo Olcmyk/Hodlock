@@ -1,22 +1,24 @@
-import { InvitePanel } from "@/features/invite";
+'use client';
+
+import { InvitePanel } from '@/features/invite';
 
 export default function InvitePage() {
   return (
-    <div className="pt-24 pb-16 px-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen py-12 px-4 bg-gradient-to-b from-white via-pink-50/30 to-white">
+      <div className="max-w-xl mx-auto">
         <div className="text-center mb-12">
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-            Invite Friends
+            Invite{' '}
+            <span className="bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent">
+              Friends
+            </span>
           </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Share your referral link and earn a portion of your referrals&apos;
-            early withdrawal penalties.
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Share your referral link and earn 30% of your referrals&apos; early withdrawal penalties forever
           </p>
         </div>
 
-        <div className="max-w-lg mx-auto">
-          <InvitePanel />
-        </div>
+        <InvitePanel />
       </div>
     </div>
   );

@@ -1,18 +1,27 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { Web3Provider } from "@/shared/providers/web3-provider";
-import { Header } from "@/widgets/header";
-import { Footer } from "@/widgets/footer";
-import { TooltipProvider } from "@/shared/ui";
+import type { Metadata } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
+import { Web3Provider } from '@/features/wallet';
+import { Header } from '@/widgets/header';
+import { Footer } from '@/widgets/footer';
+import { TooltipProvider } from '@/shared/ui';
+import './globals.css';
 
-const inter = Inter({ subsets: ["latin"] });
+const geistSans = Geist({
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
+});
+
+const geistMono = Geist_Mono({
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+});
 
 export const metadata: Metadata = {
-  title: "Hodlock - Principal-Protected On-Chain CD",
-  description:
-    "Lock your tokens, earn rewards from early withdrawers. 100% principal protected, no Ponzi scheme.",
-  keywords: ["DeFi", "staking", "HODL", "crypto", "blockchain", "Ethereum"],
+  title: 'Hodlock - Principal-Protected On-Chain CD',
+  description: 'Lock your tokens, earn rewards from paper hands. 100% principal protected, no Ponzi schemes.',
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({
@@ -22,14 +31,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-white antialiased`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white`}
+      >
         <Web3Provider>
           <TooltipProvider>
-            <div className="min-h-screen flex flex-col">
-              <Header />
-              <main className="flex-1">{children}</main>
-              <Footer />
-            </div>
+            <Header />
+            <main className="pt-16 min-h-screen">
+              {children}
+            </main>
+            <Footer />
           </TooltipProvider>
         </Web3Provider>
       </body>

@@ -1,2 +1,1 @@
-export { InvitePanel } from "./InvitePanel";
-export * from "./hooks";
+export { InvitePanel } from './ui/InvitePanel';

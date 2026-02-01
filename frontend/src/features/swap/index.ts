@@ -1,1 +1,1 @@
-export { SwapWidget } from "./SwapWidget";
+export { SwapWidget } from './ui/SwapWidget';

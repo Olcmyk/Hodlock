@@ -1,1 +1,1 @@
-export { DepositList } from "./DepositList";
+export { WithdrawList } from './ui/WithdrawList';
