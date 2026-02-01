@@ -305,18 +305,11 @@ export function LockForm() {
           </div>
 
           {/* Penalty Options */}
-          {showPenaltyOptions && !neverWithdrawEarly && (
+          {!neverWithdrawEarly && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="showPenalty"
-                  checked={showPenaltyOptions}
-                  onCheckedChange={(checked) => setShowPenaltyOptions(checked as boolean)}
-                />
-                <Label htmlFor="showPenalty" className="text-sm">
-                  Set early withdrawal penalty rate (does not affect your dividend amount)
-                </Label>
-              </div>
+              <Label className="text-sm">
+                Set early withdrawal penalty rate (does not affect your dividend amount)
+              </Label>
               <div className="grid grid-cols-4 gap-2">
                 {PENALTY_OPTIONS.map((option, index) => (
                   <button

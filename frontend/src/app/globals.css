@@ -54,28 +54,26 @@ body {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* Custom scrollbar */
+/* Hide scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  display: none;
 }
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #ec4899;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #db2777;
+html {
+  scrollbar-width: none;
 }
 
 /* Selection color */
 ::selection {
   background: rgba(236, 72, 153, 0.2);
   color: #be185d;
+}
+
+/* Fix dialog centering with scrollbar */
+html {
+  overflow-x: hidden;
+}
+
+body[data-scroll-locked] {
+  padding-right: 0 !important;
 }
