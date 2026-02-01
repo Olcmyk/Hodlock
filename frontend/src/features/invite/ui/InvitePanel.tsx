@@ -3,11 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useAppKitAccount } from '@reown/appkit/react';
 import { useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { Address, formatUnits } from 'viem';
+import { Address } from 'viem';
 import { motion } from 'framer-motion';
 import { Copy, Check, Gift, Users, AlertCircle, Coins } from 'lucide-react';
-import { TokenIcon } from '@token-icons/react';
-import Image from 'next/image';
 import {
   Button,
   Card,
@@ -15,9 +13,10 @@ import {
   CardHeader,
   CardTitle,
   Input,
+  TokenIcon,
 } from '@/shared/ui';
 import { HODLOCK_ABI } from '@/shared/config/abi';
-import { TOKEN_INFO } from '@/shared/config/contracts';
+import { useAllHodlocks } from '@/shared/hooks';
 import { formatAmount, cn } from '@/shared/lib/utils';
 
 export function InvitePanel() {
@@ -25,18 +24,19 @@ export function InvitePanel() {
   const [copied, setCopied] = useState(false);
   const [referralLink, setReferralLink] = useState('');
   const { writeContract, data: hash, isPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash });
 
-  const tokenEntries = Object.entries(TOKEN_INFO);
+  // 使用动态获取的 Hodlock 列表
+  const { tokenList, isLoading: isLoadingTokens } = useAllHodlocks();
 
   const referrerRewardsResults = useReadContracts({
-    contracts: tokenEntries.map(([, info]) => ({
+    contracts: tokenList.map((info) => ({
       address: info.hodlockAddress,
       abi: HODLOCK_ABI,
       functionName: 'referrerRewards',
       args: address ? [address as Address] : undefined,
     })),
-    query: { enabled: !!address },
+    query: { enabled: !!address && tokenList.length > 0 },
   });
 
   useEffect(() => {
@@ -126,14 +126,14 @@ export function InvitePanel() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {tokenEntries.map(([symbol, info], index) => {
+          {tokenList.map((info, index) => {
             const rewardResult = referrerRewardsResults.data?.[index];
             const reward = (rewardResult?.result as bigint) || 0n;
             const hasReward = reward > 0n;
 
             return (
               <motion.div
-                key={symbol}
+                key={info.symbol}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
@@ -143,19 +143,9 @@ export function InvitePanel() {
                 )}
               >
                 <div className="flex items-center gap-3">
-                  {symbol === 'wstETH' ? (
-                    <Image src="/resource/wstETH.svg" alt="wstETH" width={32} height={32} />
-                  ) : symbol === 'cbBTC' ? (
-                    <Image src="/resource/cbBTC.svg" alt="cbBTC" width={32} height={32} />
-                  ) : (
-                    <TokenIcon
-                      symbol={symbol}
-                      size={32}
-                      variant="branded"
-                    />
-                  )}
+                  <TokenIcon symbol={info.symbol} size={32} />
                   <div>
-                    <p className="font-medium text-gray-900">{symbol}</p>
+                    <p className="font-medium text-gray-900">{info.symbol}</p>
                     <p className="text-sm text-gray-500">
                       {formatAmount(reward, info.decimals)} available
                     </p>
@@ -173,10 +163,16 @@ export function InvitePanel() {
             );
           })}
 
-          {referrerRewardsResults.isLoading && (
+          {(referrerRewardsResults.isLoading || isLoadingTokens) && (
             <div className="text-center py-4">
               <div className="w-8 h-8 mx-auto mb-2 rounded-full border-2 border-pink-200 border-t-pink-500 animate-spin" />
               <p className="text-sm text-gray-500">Loading rewards...</p>
+            </div>
+          )}
+
+          {!isLoadingTokens && tokenList.length === 0 && (
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500">No Hodlock contracts found</p>
             </div>
           )}
         </CardContent>

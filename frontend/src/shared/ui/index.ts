@@ -38,3 +38,4 @@ export {
   SheetTitle,
   SheetDescription,
 } from './sheet';
+export { TokenIcon } from './token-icon';

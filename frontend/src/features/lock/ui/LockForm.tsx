@@ -5,10 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useAppKitAccount } from '@reown/appkit/react';
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits, formatUnits, Address, maxUint256 } from 'viem';
-import { motion } from 'framer-motion';
 import { Info, ArrowLeftRight, ChevronDown, Search, Plus, AlertCircle } from 'lucide-react';
-import { TokenIcon } from '@token-icons/react';
-import Image from 'next/image';
 import {
   Button,
   Input,
@@ -30,9 +27,11 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  TokenIcon,
 } from '@/shared/ui';
 import { HODLOCK_ABI, ERC20_ABI, FACTORY_ABI } from '@/shared/config/abi';
-import { TOKEN_INFO, CONTRACTS, HODLOCK_CONTRACTS } from '@/shared/config/contracts';
+import { CONTRACTS } from '@/shared/config/contracts';
+import { useAllHodlocks } from '@/shared/hooks';
 import { formatAmount, calculateUnlockDate, cn } from '@/shared/lib/utils';
 import { SwapWidget } from '@/features/swap';
 
@@ -54,7 +53,7 @@ const PENALTY_OPTIONS = [
 export function LockForm() {
   const searchParams = useSearchParams();
   const { address, isConnected } = useAppKitAccount();
-  const [selectedToken, setSelectedToken] = useState<string>('cbBTC');
+  const [selectedToken, setSelectedToken] = useState<string>('');
   const [amount, setAmount] = useState('');
   const [lockDays, setLockDays] = useState(365);
   const [customLockDays, setCustomLockDays] = useState('');
@@ -74,16 +73,26 @@ export function LockForm() {
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const tokenInfo = TOKEN_INFO[selectedToken];
+  // 使用动态获取的 Hodlock 列表
+  const { tokens, tokenList, isLoading: isLoadingTokens, refetch } = useAllHodlocks();
+
+  const tokenInfo = tokens[selectedToken];
   const hodlockAddress = tokenInfo?.hodlockAddress;
   const tokenAddress = tokenInfo?.tokenAddress;
 
+  // 设置默认选中的代币
+  useEffect(() => {
+    if (tokenList.length > 0 && !selectedToken) {
+      setSelectedToken(tokenList[0].symbol);
+    }
+  }, [tokenList, selectedToken]);
+
   useEffect(() => {
     const tokenParam = searchParams.get('token');
-    if (tokenParam && TOKEN_INFO[tokenParam]) {
+    if (tokenParam && tokens[tokenParam]) {
       setSelectedToken(tokenParam);
     }
-  }, [searchParams]);
+  }, [searchParams, tokens]);
 
   const { data: balance } = useReadContract({
     address: tokenAddress,
@@ -152,8 +161,8 @@ export function LockForm() {
     }
   };
 
-  const filteredTokens = Object.entries(TOKEN_INFO).filter(([key, info]) =>
-    key.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  const filteredTokens = tokenList.filter((info) =>
+    info.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
     info.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -166,6 +175,15 @@ export function LockForm() {
       args: [newTokenAddress as Address],
     });
   };
+
+  // 创建合约成功后刷新列表
+  useEffect(() => {
+    if (isSuccess) {
+      refetch();
+      setShowCreateContract(false);
+      setNewTokenAddress('');
+    }
+  }, [isSuccess, refetch]);
 
   if (!isConnected) {
     return (
@@ -196,17 +214,19 @@ export function LockForm() {
               className="w-full flex items-center justify-between p-4 rounded-xl border-2 border-gray-200 hover:border-pink-300 transition-colors"
             >
               <div className="flex items-center gap-3">
-                {selectedToken === 'wstETH' ? (
-                  <Image src="/resource/wstETH.svg" alt="wstETH" width={32} height={32} />
-                ) : selectedToken === 'cbBTC' ? (
-                  <Image src="/resource/cbBTC.svg" alt="cbBTC" width={32} height={32} />
+                {tokenInfo ? (
+                  <>
+                    <TokenIcon symbol={selectedToken} size={32} />
+                    <div className="text-left">
+                      <p className="font-medium text-gray-900">{selectedToken}</p>
+                      <p className="text-sm text-gray-500">{tokenInfo?.name}</p>
+                    </div>
+                  </>
                 ) : (
-                  <TokenIcon symbol={selectedToken} size={32} variant="branded" />
+                  <p className="text-gray-500">
+                    {isLoadingTokens ? 'Loading tokens...' : 'Select a token'}
+                  </p>
                 )}
-                <div className="text-left">
-                  <p className="font-medium text-gray-900">{selectedToken}</p>
-                  <p className="text-sm text-gray-500">{tokenInfo?.name}</p>
-                </div>
               </div>
               <ChevronDown className="w-5 h-5 text-gray-400" />
             </button>
@@ -417,26 +437,25 @@ export function LockForm() {
               />
             </div>
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {filteredTokens.length > 0 ? (
-                filteredTokens.map(([key, info]) => (
+              {isLoadingTokens ? (
+                <div className="text-center py-4">
+                  <div className="w-8 h-8 mx-auto mb-2 rounded-full border-2 border-pink-200 border-t-pink-500 animate-spin" />
+                  <p className="text-sm text-gray-500">Loading tokens...</p>
+                </div>
+              ) : filteredTokens.length > 0 ? (
+                filteredTokens.map((info) => (
                   <button
-                    key={key}
+                    key={info.symbol}
                     onClick={() => {
-                      setSelectedToken(key);
+                      setSelectedToken(info.symbol);
                       setShowTokenSearch(false);
                       setSearchQuery('');
                     }}
                     className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors"
                   >
-                    {key === 'wstETH' ? (
-                      <Image src="/resource/wstETH.svg" alt="wstETH" width={32} height={32} />
-                    ) : key === 'cbBTC' ? (
-                      <Image src="/resource/cbBTC.svg" alt="cbBTC" width={32} height={32} />
-                    ) : (
-                      <TokenIcon symbol={key} size={32} variant="branded" />
-                    )}
+                    <TokenIcon symbol={info.symbol} size={32} />
                     <div className="text-left">
-                      <p className="font-medium text-gray-900">{key}</p>
+                      <p className="font-medium text-gray-900">{info.symbol}</p>
                       <p className="text-sm text-gray-500">{info.name}</p>
                     </div>
                   </button>
