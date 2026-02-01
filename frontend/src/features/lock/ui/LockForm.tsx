@@ -26,6 +26,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
 } from '@/shared/ui';
 import { HODLOCK_ABI, ERC20_ABI, FACTORY_ABI } from '@/shared/config/abi';
 import { TOKEN_INFO, CONTRACTS, HODLOCK_CONTRACTS } from '@/shared/config/contracts';
@@ -215,13 +219,13 @@ export function LockForm() {
               <div className="flex items-center gap-2 text-sm">
                 <button
                   onClick={handleMaxClick}
-                  className="text-pink-500 hover:text-pink-600 font-medium"
+                  className="text-pink-500 hover:text-pink-600 hover:bg-pink-50 font-medium px-2 py-1 rounded-md transition-colors"
                 >
                   Max: {balance && tokenInfo ? formatAmount(balance, tokenInfo.decimals) : '0'} {selectedToken}
                 </button>
                 <button
                   onClick={() => setShowSwapWidget(true)}
-                  className="flex items-center gap-1 text-pink-500 hover:text-pink-600 font-medium"
+                  className="flex items-center gap-1 text-pink-500 hover:text-pink-600 hover:bg-pink-50 font-medium px-2 py-1 rounded-md transition-colors"
                 >
                   <ArrowLeftRight className="w-4 h-4" />
                   SWAP
@@ -483,15 +487,17 @@ export function LockForm() {
         </DialogContent>
       </Dialog>
 
-      {/* Swap Widget Dialog */}
-      <Dialog open={showSwapWidget} onOpenChange={setShowSwapWidget}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Swap Tokens</DialogTitle>
-          </DialogHeader>
-          <SwapWidget toToken={tokenAddress} />
-        </DialogContent>
-      </Dialog>
+      {/* Swap Widget Sheet */}
+      <Sheet open={showSwapWidget} onOpenChange={setShowSwapWidget}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Swap Tokens</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <SwapWidget toToken={tokenAddress} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
