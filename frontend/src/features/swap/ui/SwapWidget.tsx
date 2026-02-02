@@ -1,8 +1,7 @@
 'use client';
 
 import { Address } from 'viem';
-import { useEffect, useState } from 'react';
-import { LiFiWidget, WidgetConfig } from '@lifi/widget';
+import { useEffect, useState, ComponentType } from 'react';
 import { useAccount } from 'wagmi';
 
 interface SwapWidgetProps {
@@ -33,13 +32,20 @@ const BASE_TOKENS = {
 
 export function SwapWidget({ toToken }: SwapWidgetProps) {
   const [mounted, setMounted] = useState(false);
+  const [LiFiWidgetComponent, setLiFiWidgetComponent] = useState<ComponentType<any> | null>(null);
   const { address, isConnected } = useAccount();
 
   useEffect(() => {
     setMounted(true);
+    // Dynamic import to avoid SSR issues
+    import('@lifi/widget').then((mod) => {
+      setLiFiWidgetComponent(() => mod.LiFiWidget);
+    }).catch((err) => {
+      console.error('Failed to load LiFi Widget:', err);
+    });
   }, []);
 
-  if (!mounted) {
+  if (!mounted || !LiFiWidgetComponent) {
     return (
       <div className="w-full h-[600px] flex items-center justify-center bg-gray-50 rounded-2xl">
         <div className="text-center">
@@ -60,7 +66,7 @@ export function SwapWidget({ toToken }: SwapWidgetProps) {
     );
   }
 
-  const widgetConfig: WidgetConfig = {
+  const widgetConfig = {
     integrator: LIFI_INTEGRATION_ID,
     chains: {
       allow: [
@@ -75,7 +81,7 @@ export function SwapWidget({ toToken }: SwapWidgetProps) {
     },
     toChain: CHAINS.BASE,
     toToken: toToken || BASE_TOKENS.USDC,
-    appearance: 'light',
+    appearance: 'light' as const,
     theme: {
       palette: {
         primary: {
@@ -95,7 +101,7 @@ export function SwapWidget({ toToken }: SwapWidgetProps) {
     <div className="space-y-2">
       {/* LiFi Widget */}
       <div className="lifi-widget-container rounded-2xl overflow-hidden">
-        <LiFiWidget integrator={LIFI_INTEGRATION_ID} config={widgetConfig} />
+        <LiFiWidgetComponent integrator={LIFI_INTEGRATION_ID} config={widgetConfig} />
       </div>
 
       {/* Powered by */}
