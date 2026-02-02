@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useAppKitAccount } from '@reown/appkit/react';
-import { useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { Address } from 'viem';
 import { motion } from 'framer-motion';
 import { Clock, AlertCircle, Trophy, Hourglass, Award } from 'lucide-react';
@@ -35,7 +34,7 @@ interface DepositWithMeta extends DepositInfo {
 }
 
 export function WithdrawList() {
-  const { address, isConnected } = useAppKitAccount();
+  const { address, isConnected } = useAccount();
   const [deposits, setDeposits] = useState<DepositWithMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const { writeContract, data: hash, isPending } = useWriteContract();

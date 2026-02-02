@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAppKitAccount } from '@reown/appkit/react';
-import { useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { Address } from 'viem';
 import { motion } from 'framer-motion';
 import { Copy, Check, Gift, Users, AlertCircle, Coins } from 'lucide-react';
@@ -20,7 +19,7 @@ import { useAllHodlocks } from '@/shared/hooks';
 import { formatAmount, cn } from '@/shared/lib/utils';
 
 export function InvitePanel() {
-  const { address, isConnected } = useAppKitAccount();
+  const { address, isConnected } = useAccount();
   const [copied, setCopied] = useState(false);
   const [referralLink, setReferralLink] = useState('');
   const { writeContract, data: hash, isPending } = useWriteContract();

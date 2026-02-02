@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useAppKitAccount } from '@reown/appkit/react';
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits, formatUnits, Address, maxUint256 } from 'viem';
 import { Info, ArrowLeftRight, ChevronDown, Search, Plus, AlertCircle } from 'lucide-react';
 import {
@@ -52,7 +51,7 @@ const PENALTY_OPTIONS = [
 
 export function LockForm() {
   const searchParams = useSearchParams();
-  const { address, isConnected } = useAppKitAccount();
+  const { address, isConnected } = useAccount();
   const [selectedToken, setSelectedToken] = useState<string>('');
   const [amount, setAmount] = useState('');
   const [lockDays, setLockDays] = useState(365);

@@ -1,8 +1,7 @@
 'use client';
 
-import { cookieStorage, createStorage } from '@wagmi/core';
-import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
-import { base } from '@reown/appkit/networks';
+import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { base } from 'wagmi/chains';
 
 export const projectId = '98142860012c5e88d3db516ad6f72950';
 
@@ -10,15 +9,9 @@ if (!projectId) {
   throw new Error('Project ID is not defined');
 }
 
-export const networks = [base];
-
-export const wagmiAdapter = new WagmiAdapter({
-  storage: createStorage({
-    storage: cookieStorage,
-  }),
-  ssr: true,
+export const config = getDefaultConfig({
+  appName: 'Hodlock',
   projectId,
-  networks,
+  chains: [base],
+  ssr: true,
 });
-
-export const config = wagmiAdapter.wagmiConfig;
