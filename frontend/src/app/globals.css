@@ -90,3 +90,115 @@ wui-flex.wui-cover {
   -webkit-backdrop-filter: none !important;
   background: transparent !important;
 }
+
+/* LiFi Widget Custom Styles - Jumper Exchange Style */
+.lifi-widget-container {
+  /* Ensure proper sizing */
+  min-height: 600px;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* Override LiFi Widget styles to match Jumper Exchange */
+.lifi-widget-container [class*="MuiPaper"] {
+  background: #1A1A1A !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37) !important;
+  border-radius: 16px !important;
+}
+
+/* Widget container background */
+.lifi-widget-container {
+  background: #0F0F0F;
+  border-radius: 16px;
+  padding: 0;
+}
+
+/* Improve button styles */
+.lifi-widget-container button {
+  transition: all 0.2s ease-in-out !important;
+  border-radius: 12px !important;
+}
+
+.lifi-widget-container button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3) !important;
+}
+
+/* Primary button styling */
+.lifi-widget-container button[class*="MuiButton-contained"] {
+  background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%) !important;
+  font-weight: 600 !important;
+}
+
+.lifi-widget-container button[class*="MuiButton-contained"]:hover {
+  background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%) !important;
+}
+
+/* Route display improvements */
+.lifi-widget-container [class*="Route"] {
+  border-radius: 12px !important;
+  transition: all 0.2s ease-in-out !important;
+  background: rgba(139, 92, 246, 0.05) !important;
+  border: 1px solid rgba(139, 92, 246, 0.1) !important;
+}
+
+.lifi-widget-container [class*="Route"]:hover {
+  transform: scale(1.01);
+  background: rgba(139, 92, 246, 0.1) !important;
+  border: 1px solid rgba(139, 92, 246, 0.2) !important;
+}
+
+/* Token selector improvements */
+.lifi-widget-container [class*="TokenSelect"] {
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.lifi-widget-container [class*="TokenSelect"]:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Input field improvements */
+.lifi-widget-container input {
+  font-size: 1.5rem !important;
+  font-weight: 600 !important;
+  color: #FFFFFF !important;
+}
+
+.lifi-widget-container input::placeholder {
+  color: #A0A0A0 !important;
+}
+
+/* Loading state improvements */
+.lifi-widget-container [class*="Skeleton"] {
+  border-radius: 8px !important;
+  background: rgba(139, 92, 246, 0.1) !important;
+}
+
+/* Card styling */
+.lifi-widget-container [class*="Card"] {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 12px !important;
+}
+
+/* Scrollbar styling for widget */
+.lifi-widget-container *::-webkit-scrollbar {
+  width: 8px;
+  display: block;
+}
+
+.lifi-widget-container *::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.lifi-widget-container *::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.5);
+  border-radius: 4px;
+}
+
+.lifi-widget-container *::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.7);
+}

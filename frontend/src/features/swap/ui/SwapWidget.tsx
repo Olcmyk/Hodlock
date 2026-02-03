@@ -2,24 +2,46 @@
 
 import { Address } from 'viem';
 import { useEffect, useState, ComponentType } from 'react';
-import { useAccount } from 'wagmi';
+import { useAccount, useWalletClient, useConfig } from 'wagmi';
+import type { WidgetConfig } from '@lifi/widget';
 
 interface SwapWidgetProps {
   toToken?: Address;
+  fromChain?: number;
+  toChain?: number;
 }
 
-// LiFi integration ID
-const LIFI_INTEGRATION_ID = '90c75604-5979-442d-9a9c-16fc29abfea2.661bf9c9-be2a-4a81-936a-1d07151deaa2';
+// LiFi integration ID - use the short name, not the full UUID
+const LIFI_INTEGRATION_ID = 'hodlock2';
 
-// Chain IDs
+// Chain IDs - Extended list like Jumper Exchange
 const CHAINS = {
   ETHEREUM: 1,
   OPTIMISM: 10,
   BSC: 56,
+  GNOSIS: 100,
   POLYGON: 137,
-  BASE: 8453,
-  ARBITRUM: 42161,
+  FANTOM: 250,
+  BOBA: 288,
+  MOONRIVER: 1285,
+  MOONBEAM: 1284,
+  CELO: 42220,
   AVALANCHE: 43114,
+  ARBITRUM: 42161,
+  HARMONY: 1666600000,
+  FUSE: 122,
+  OKX: 66,
+  CRONOS: 25,
+  VELAS: 106,
+  METIS: 1088,
+  BASE: 8453,
+  LINEA: 59144,
+  POLYGON_ZKEVM: 1101,
+  SCROLL: 534352,
+  ZKSYNC: 324,
+  MANTLE: 5000,
+  BLAST: 81457,
+  MODE: 34443,
 };
 
 // Token addresses on Base
@@ -30,84 +52,112 @@ const BASE_TOKENS = {
   ETH: '0x0000000000000000000000000000000000000000',
 };
 
-export function SwapWidget({ toToken }: SwapWidgetProps) {
+export function SwapWidget({ toToken, fromChain, toChain }: SwapWidgetProps) {
   const [mounted, setMounted] = useState(false);
   const [LiFiWidgetComponent, setLiFiWidgetComponent] = useState<ComponentType<any> | null>(null);
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chain } = useAccount();
+  const { data: walletClient } = useWalletClient();
+  const wagmiConfig = useConfig();
 
   useEffect(() => {
     setMounted(true);
     // Dynamic import to avoid SSR issues
     import('@lifi/widget').then((mod) => {
       setLiFiWidgetComponent(() => mod.LiFiWidget);
+      console.log('LiFi Widget loaded successfully');
     }).catch((err) => {
       console.error('Failed to load LiFi Widget:', err);
     });
   }, []);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('SwapWidget state:', {
+      mounted,
+      isConnected,
+      address,
+      chainId: chain?.id,
+      hasWalletClient: !!walletClient,
+      hasWagmiConfig: !!wagmiConfig,
+    });
+  }, [mounted, isConnected, address, chain, walletClient, wagmiConfig]);
+
   if (!mounted || !LiFiWidgetComponent) {
     return (
-      <div className="w-full h-[600px] flex items-center justify-center bg-gray-50 rounded-2xl">
+      <div className="w-full h-[600px] flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-2xl">
         <div className="text-center">
           <div className="w-8 h-8 mx-auto mb-2 rounded-full border-2 border-gray-200 border-t-gray-500 animate-spin" />
-          <p className="text-sm text-gray-500">Loading swap widget...</p>
+          <p className="text-sm text-gray-500">加载交换组件中...</p>
         </div>
       </div>
     );
   }
 
-  if (!isConnected || !address) {
+  if (!isConnected || !address || !walletClient) {
     return (
-      <div className="w-full h-[600px] flex items-center justify-center bg-gray-50 rounded-2xl">
+      <div className="w-full h-[600px] flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-2xl">
         <div className="text-center">
-          <p className="text-sm text-gray-500">请先连接钱包以使用换币功能</p>
+          <p className="text-sm text-gray-500">
+            {!isConnected ? '请先连接钱包以使用换币功能' : '正在连接钱包...'}
+          </p>
         </div>
       </div>
     );
   }
 
-  const widgetConfig = {
+  // Widget config with better settings
+  const widgetConfig: WidgetConfig = {
     integrator: LIFI_INTEGRATION_ID,
-    chains: {
-      allow: [
-        CHAINS.ETHEREUM,
-        CHAINS.OPTIMISM,
-        CHAINS.BSC,
-        CHAINS.POLYGON,
-        CHAINS.BASE,
-        CHAINS.ARBITRUM,
-        CHAINS.AVALANCHE,
-      ],
-    },
-    toChain: CHAINS.BASE,
-    toToken: toToken || BASE_TOKENS.USDC,
-    appearance: 'light' as const,
+    variant: 'wide',
+    appearance: 'dark',
+
+    // Optional: Add theme for better styling
     theme: {
       palette: {
         primary: {
-          main: '#000000',
+          main: '#8B5CF6',
         },
-        secondary: {
-          main: '#ec4899',
+        background: {
+          default: '#0F0F0F',
+          paper: '#1A1A1A',
         },
       },
-      shape: {
-        borderRadius: 12,
-      },
+    },
+
+    // Optional: Language settings
+    languages: {
+      default: 'zh',
+      allow: ['zh', 'en'],
     },
   };
 
+  console.log('Widget config:', {
+    fromChain: widgetConfig.fromChain,
+    toChain: widgetConfig.toChain,
+    toToken: widgetConfig.toToken,
+  });
+
   return (
-    <div className="space-y-2">
+    <div className="w-full max-w-[480px] mx-auto space-y-4">
       {/* LiFi Widget */}
-      <div className="lifi-widget-container rounded-2xl overflow-hidden">
+      <div className="lifi-widget-container">
         <LiFiWidgetComponent integrator={LIFI_INTEGRATION_ID} config={widgetConfig} />
       </div>
 
-      {/* Powered by */}
-      <p className="text-center text-xs text-gray-400">
-        Powered by LiFi Protocol
-      </p>
+      {/* Powered by footer */}
+      <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+        <span>Powered by</span>
+        <a
+          href="https://li.fi"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-semibold text-purple-400 hover:text-purple-300 transition-colors"
+        >
+          LiFi Protocol
+        </a>
+        <span>·</span>
+        <span>与 Jumper Exchange 相同的技术</span>
+      </div>
     </div>
   );
 }
