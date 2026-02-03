@@ -4,6 +4,7 @@ import { Web3Provider } from '@/features/wallet';
 import { Header } from '@/widgets/header';
 import { Footer } from '@/widgets/footer';
 import { TooltipProvider } from '@/shared/ui';
+import { ReferralCapture } from '@/shared/components/ReferralCapture';
 import './globals.css';
 
 const geistSans = Geist({
@@ -36,6 +37,7 @@ export default function RootLayout({
       >
         <Web3Provider>
           <TooltipProvider>
+            <ReferralCapture />
             <Header />
             <main className="pt-16 min-h-screen">
               {children}

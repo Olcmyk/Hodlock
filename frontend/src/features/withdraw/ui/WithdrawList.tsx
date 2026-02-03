@@ -31,6 +31,7 @@ interface DepositWithMeta extends DepositInfo {
   depositId: number;
   tokenSymbol: string;
   hodlockAddress: Address;
+  hasNFT: boolean;
 }
 
 export function WithdrawList() {
@@ -66,6 +67,14 @@ export function WithdrawList() {
             }) as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, boolean];
 
             if (!deposit[7]) {
+              // 查询该存单是否已铸造 NFT
+              const hasNFT = await publicClient.readContract({
+                address: info.hodlockAddress,
+                abi: HODLOCK_ABI,
+                functionName: 'hasNFT',
+                args: [address as Address, BigInt(i)],
+              }) as boolean;
+
               allDeposits.push({
                 amount: deposit[0],
                 originalAmount: deposit[1],
@@ -78,6 +87,7 @@ export function WithdrawList() {
                 depositId: i,
                 tokenSymbol: symbol,
                 hodlockAddress: info.hodlockAddress,
+                hasNFT,
               });
             }
           } catch (e) {
@@ -273,14 +283,25 @@ export function WithdrawList() {
                     </Button>
                   )}
 
-                  <Button
-                    variant="outline"
-                    onClick={() => handleMintNFT(deposit.hodlockAddress, deposit.depositId)}
-                    disabled={isPending || isConfirming}
-                  >
-                    <Award className="w-4 h-4 mr-2" />
-                    Mint NFT
-                  </Button>
+                  {deposit.hasNFT ? (
+                    <Button
+                      variant="outline"
+                      disabled
+                      className="text-green-600 border-green-200 bg-green-50"
+                    >
+                      <Award className="w-4 h-4 mr-2" />
+                      NFT Minted
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={() => handleMintNFT(deposit.hodlockAddress, deposit.depositId)}
+                      disabled={isPending || isConfirming}
+                    >
+                      <Award className="w-4 h-4 mr-2" />
+                      Mint NFT
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

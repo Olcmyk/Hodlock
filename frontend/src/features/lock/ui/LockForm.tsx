@@ -28,6 +28,7 @@ import { HODLOCK_ABI, ERC20_ABI, FACTORY_ABI } from '@/shared/config/abi';
 import { CONTRACTS } from '@/shared/config/contracts';
 import { useAllHodlocks } from '@/shared/hooks';
 import { formatAmount, calculateUnlockDate, cn } from '@/shared/lib/utils';
+import { getReferrer } from '@/shared/components/ReferralCapture';
 import { SwapWidget } from '@/features/swap';
 
 const LOCK_PERIODS = [
@@ -45,6 +46,9 @@ const PENALTY_OPTIONS = [
   { label: 'Custom', value: 0 },
 ];
 
+// 交易流程步骤
+type TransactionStep = 'idle' | 'approving' | 'depositing' | 'minting' | 'done';
+
 export function LockForm() {
   const searchParams = useSearchParams();
   const { address, isConnected } = useAccount();
@@ -57,7 +61,6 @@ export function LockForm() {
   const [customPenalty, setCustomPenalty] = useState('');
   const [selectedPenaltyOption, setSelectedPenaltyOption] = useState(1);
   const [mintNFT, setMintNFT] = useState(true);
-  const [showPenaltyOptions, setShowPenaltyOptions] = useState(true);
   const [neverWithdrawEarly, setNeverWithdrawEarly] = useState(false);
   const [showSwapWidget, setShowSwapWidget] = useState(false);
   const [showTokenSearch, setShowTokenSearch] = useState(false);
@@ -65,7 +68,12 @@ export function LockForm() {
   const [showCreateContract, setShowCreateContract] = useState(false);
   const [newTokenAddress, setNewTokenAddress] = useState('');
 
-  const { writeContract, data: hash, isPending } = useWriteContract();
+  // 交易流程状态
+  const [txStep, setTxStep] = useState<TransactionStep>('idle');
+  const [depositCountBefore, setDepositCountBefore] = useState<bigint | null>(null);
+  const [startedWithApproval, setStartedWithApproval] = useState(false);
+
+  const { writeContract, data: hash, isPending, reset: resetWrite } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   // 使用动态获取的 Hodlock 列表
@@ -97,7 +105,7 @@ export function LockForm() {
     query: { enabled: !!address && !!tokenAddress },
   });
 
-  const { data: allowance } = useReadContract({
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: tokenAddress,
     abi: ERC20_ABI,
     functionName: 'allowance',
@@ -105,13 +113,25 @@ export function LockForm() {
     query: { enabled: !!address && !!tokenAddress && !!hodlockAddress },
   });
 
+  // 获取用户当前存单数量（用于计算新存单的 depositId）
+  const { data: depositCount, refetch: refetchDepositCount } = useReadContract({
+    address: hodlockAddress,
+    abi: HODLOCK_ABI,
+    functionName: 'getDepositCount',
+    args: address ? [address as Address] : undefined,
+    query: { enabled: !!address && !!hodlockAddress },
+  });
+
   const [referrer, setReferrer] = useState('0x0000000000000000000000000000000000000000');
 
   useEffect(() => {
+    // First check URL params, then fall back to localStorage
     const urlParams = new URLSearchParams(window.location.search);
     const ref = urlParams.get('ref');
-    if (ref) {
+    if (ref && /^0x[a-fA-F0-9]{40}$/.test(ref)) {
       setReferrer(ref);
+    } else {
+      setReferrer(getReferrer());
     }
   }, []);
 
@@ -131,26 +151,95 @@ export function LockForm() {
 
   const needsApproval = allowance !== undefined && amountInWei > 0n && allowance < amountInWei;
 
-  const handleApprove = () => {
-    if (!tokenAddress || !hodlockAddress) return;
-    writeContract({
-      address: tokenAddress,
-      abi: ERC20_ABI,
-      functionName: 'approve',
-      args: [hodlockAddress, maxUint256],
-    });
+  // 处理交易流程
+  const handleSubmit = async () => {
+    if (!hodlockAddress || !amountInWei || !tokenAddress) return;
+
+    // 记录当前存单数量（用于后续获取新存单的 depositId）
+    if (depositCount !== undefined) {
+      setDepositCountBefore(depositCount);
+    }
+
+    // 记录开始时是否需要 approve
+    setStartedWithApproval(needsApproval);
+
+    if (needsApproval) {
+      // 需要先 approve
+      setTxStep('approving');
+      writeContract({
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [hodlockAddress, maxUint256],
+      });
+    } else {
+      // 不需要 approve，直接 deposit
+      setTxStep('depositing');
+      const lockSeconds = BigInt(actualLockDays * 86400);
+      writeContract({
+        address: hodlockAddress,
+        abi: HODLOCK_ABI,
+        functionName: 'deposit',
+        args: [amountInWei, lockSeconds, BigInt(actualPenaltyBps), referrer as Address],
+      });
+    }
   };
 
-  const handleDeposit = () => {
-    if (!hodlockAddress || !amountInWei) return;
-    const lockSeconds = BigInt(actualLockDays * 86400);
-    writeContract({
-      address: hodlockAddress,
-      abi: HODLOCK_ABI,
-      functionName: 'deposit',
-      args: [amountInWei, lockSeconds, BigInt(actualPenaltyBps), referrer as Address],
-    });
-  };
+  // 监听交易成功，执行下一步
+  useEffect(() => {
+    if (!isSuccess) return;
+
+    const executeNextStep = async () => {
+      if (txStep === 'approving') {
+        // Approve 成功，刷新 allowance 并执行 deposit
+        await refetchAllowance();
+        resetWrite();
+        setTxStep('depositing');
+        const lockSeconds = BigInt(actualLockDays * 86400);
+        writeContract({
+          address: hodlockAddress!,
+          abi: HODLOCK_ABI,
+          functionName: 'deposit',
+          args: [amountInWei, lockSeconds, BigInt(actualPenaltyBps), referrer as Address],
+        });
+      } else if (txStep === 'depositing') {
+        // Deposit 成功
+        if (mintNFT) {
+          // 需要铸造 NFT
+          await refetchDepositCount();
+          resetWrite();
+          setTxStep('minting');
+          // 新存单的 depositId 就是之前的存单数量（因为索引从 0 开始）
+          const newDepositId = depositCountBefore ?? 0n;
+          writeContract({
+            address: hodlockAddress!,
+            abi: HODLOCK_ABI,
+            functionName: 'mintNFT',
+            args: [newDepositId],
+          });
+        } else {
+          // 不需要铸造 NFT，流程完成
+          setTxStep('done');
+          setAmount('');
+        }
+      } else if (txStep === 'minting') {
+        // Mint NFT 成功，流程完成
+        setTxStep('done');
+        setAmount('');
+      }
+    };
+
+    executeNextStep();
+  }, [isSuccess, txStep]);
+
+  // 重置状态当用户改变输入时
+  useEffect(() => {
+    if (txStep === 'done') {
+      setTxStep('idle');
+      setDepositCountBefore(null);
+      setStartedWithApproval(false);
+    }
+  }, [amount, selectedToken]);
 
   const handleMaxClick = () => {
     if (balance && tokenInfo) {
@@ -175,12 +264,12 @@ export function LockForm() {
 
   // 创建合约成功后刷新列表
   useEffect(() => {
-    if (isSuccess) {
+    if (isSuccess && txStep === 'idle') {
       refetch();
       setShowCreateContract(false);
       setNewTokenAddress('');
     }
-  }, [isSuccess, refetch]);
+  }, [isSuccess, refetch, txStep]);
 
   if (!isConnected) {
     return (
@@ -397,14 +486,22 @@ export function LockForm() {
           <Button
             className="w-full"
             size="lg"
-            onClick={needsApproval ? handleApprove : handleDeposit}
-            disabled={isPending || isConfirming || !amount || amountInWei === 0n}
+            onClick={handleSubmit}
+            disabled={isPending || isConfirming || !amount || amountInWei === 0n || (txStep !== 'idle' && txStep !== 'done')}
           >
-            {isPending || isConfirming
-              ? 'Processing...'
+            {txStep === 'approving'
+              ? mintNFT ? 'Step 1/3: Approving...' : 'Step 1/2: Approving...'
+              : txStep === 'depositing'
+              ? startedWithApproval
+                ? mintNFT ? 'Step 2/3: Depositing...' : 'Step 2/2: Depositing...'
+                : mintNFT ? 'Step 1/2: Depositing...' : 'Depositing...'
+              : txStep === 'minting'
+              ? startedWithApproval ? 'Step 3/3: Minting NFT...' : 'Step 2/2: Minting NFT...'
+              : txStep === 'done'
+              ? 'Success!'
               : needsApproval
-              ? 'Approve & Deposit'
-              : 'Deposit'}
+              ? mintNFT ? 'Approve & Deposit & Mint NFT' : 'Approve & Deposit'
+              : mintNFT ? 'Deposit & Mint NFT' : 'Deposit'}
           </Button>
 
           {/* Create Contract Link */}

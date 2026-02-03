@@ -135,6 +135,16 @@ export const HODLOCK_ABI = [
     type: 'function',
   },
   {
+    inputs: [
+      { internalType: 'address', name: '', type: 'address' },
+      { internalType: 'uint256', name: '', type: 'uint256' },
+    ],
+    name: 'hasNFT',
+    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
     anonymous: false,
     inputs: [
       { indexed: true, internalType: 'address', name: 'user', type: 'address' },
