@@ -22,10 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
   TokenIcon,
 } from '@/shared/ui';
 import { HODLOCK_ABI, ERC20_ABI, FACTORY_ABI } from '@/shared/config/abi';
@@ -505,17 +501,17 @@ export function LockForm() {
         </DialogContent>
       </Dialog>
 
-      {/* Swap Widget Sheet */}
-      <Sheet open={showSwapWidget} onOpenChange={setShowSwapWidget}>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Swap Tokens</SheetTitle>
-          </SheetHeader>
+      {/* Swap Widget Dialog */}
+      <Dialog open={showSwapWidget} onOpenChange={setShowSwapWidget}>
+        <DialogContent className="max-w-[520px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Swap Tokens</DialogTitle>
+          </DialogHeader>
           <div className="mt-4">
             <SwapWidget toToken={tokenAddress} />
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

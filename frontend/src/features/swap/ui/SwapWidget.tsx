@@ -84,7 +84,7 @@ export function SwapWidget({ toToken, fromChain, toChain }: SwapWidgetProps) {
 
   if (!mounted || !LiFiWidgetComponent) {
     return (
-      <div className="w-full h-[600px] flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-2xl">
+      <div className="w-full h-[600px] flex items-center justify-center bg-white rounded-2xl">
         <div className="text-center">
           <div className="w-8 h-8 mx-auto mb-2 rounded-full border-2 border-gray-200 border-t-gray-500 animate-spin" />
           <p className="text-sm text-gray-500">加载交换组件中...</p>
@@ -95,7 +95,7 @@ export function SwapWidget({ toToken, fromChain, toChain }: SwapWidgetProps) {
 
   if (!isConnected || !address || !walletClient) {
     return (
-      <div className="w-full h-[600px] flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-2xl">
+      <div className="w-full h-[600px] flex items-center justify-center bg-white rounded-2xl">
         <div className="text-center">
           <p className="text-sm text-gray-500">
             {!isConnected ? '请先连接钱包以使用换币功能' : '正在连接钱包...'}
@@ -109,17 +109,17 @@ export function SwapWidget({ toToken, fromChain, toChain }: SwapWidgetProps) {
   const widgetConfig: WidgetConfig = {
     integrator: LIFI_INTEGRATION_ID,
     variant: 'wide',
-    appearance: 'dark',
+    appearance: 'light',
 
     // Optional: Add theme for better styling
     theme: {
       palette: {
         primary: {
-          main: '#8B5CF6',
+          main: '#ec4899',
         },
         background: {
-          default: '#0F0F0F',
-          paper: '#1A1A1A',
+          default: '#ffffff',
+          paper: '#ffffff',
         },
       },
     },
@@ -145,13 +145,13 @@ export function SwapWidget({ toToken, fromChain, toChain }: SwapWidgetProps) {
       </div>
 
       {/* Powered by footer */}
-      <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+      <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
         <span>Powered by</span>
         <a
           href="https://li.fi"
           target="_blank"
           rel="noopener noreferrer"
-          className="font-semibold text-purple-400 hover:text-purple-300 transition-colors"
+          className="font-semibold text-pink-500 hover:text-pink-400 transition-colors"
         >
           LiFi Protocol
         </a>

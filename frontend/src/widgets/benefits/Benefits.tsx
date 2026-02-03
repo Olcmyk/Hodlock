@@ -8,25 +8,25 @@ const benefits = [
     icon: Shield,
     title: '100% Principal Protected',
     description: 'Your original deposit is always safe. Only early withdrawers pay penalties.',
-    gradient: 'from-green-400 to-emerald-500',
+    gradient: 'from-pink-300 to-rose-400',
   },
   {
     icon: Ban,
     title: 'No Ponzi Schemes',
     description: 'Rewards come from early withdrawal penalties, not from new deposits.',
-    gradient: 'from-blue-400 to-indigo-500',
+    gradient: 'from-rose-300 to-pink-400',
   },
   {
     icon: TrendingUp,
     title: 'Higher Yields for ERC20',
     description: 'Earn additional rewards on top of your existing token holdings.',
-    gradient: 'from-purple-400 to-violet-500',
+    gradient: 'from-pink-400 to-rose-500',
   },
   {
     icon: Gem,
     title: 'Diamond Hands Win',
     description: 'Paper hands pay penalties that go directly to diamond hand holders.',
-    gradient: 'from-pink-400 to-rose-500',
+    gradient: 'from-rose-400 to-pink-500',
   },
 ];
 
