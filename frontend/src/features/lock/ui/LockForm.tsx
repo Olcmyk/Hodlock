@@ -105,12 +105,14 @@ export function LockForm() {
     query: { enabled: !!address && !!tokenAddress && !!hodlockAddress },
   });
 
-  const referrer = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      return urlParams.get('ref') || '0x0000000000000000000000000000000000000000';
+  const [referrer, setReferrer] = useState('0x0000000000000000000000000000000000000000');
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const ref = urlParams.get('ref');
+    if (ref) {
+      setReferrer(ref);
     }
-    return '0x0000000000000000000000000000000000000000';
   }, []);
 
   const actualLockDays = selectedLockPeriod === 4 ? parseInt(customLockDays) || 0 : lockDays;
