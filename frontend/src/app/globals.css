@@ -94,9 +94,9 @@ wui-flex.wui-cover {
 /* LiFi Widget Custom Styles - Rose Pink Theme */
 .lifi-widget-container {
   /* Ensure proper sizing */
-  min-height: 600px;
+  min-height: 500px;
   width: 100%;
-  max-width: 480px;
+  max-width: 400px;
   margin: 0 auto;
 }
 

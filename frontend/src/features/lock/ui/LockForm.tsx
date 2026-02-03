@@ -503,7 +503,7 @@ export function LockForm() {
 
       {/* Swap Widget Dialog */}
       <Dialog open={showSwapWidget} onOpenChange={setShowSwapWidget}>
-        <DialogContent className="max-w-[520px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Swap Tokens</DialogTitle>
           </DialogHeader>

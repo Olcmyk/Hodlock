@@ -108,7 +108,7 @@ export function SwapWidget({ toToken, fromChain, toChain }: SwapWidgetProps) {
   // Widget config with better settings
   const widgetConfig: WidgetConfig = {
     integrator: LIFI_INTEGRATION_ID,
-    variant: 'wide',
+    variant: 'compact',
     appearance: 'light',
 
     // Optional: Add theme for better styling
@@ -126,7 +126,7 @@ export function SwapWidget({ toToken, fromChain, toChain }: SwapWidgetProps) {
 
     // Optional: Language settings
     languages: {
-      default: 'zh',
+      default: 'en',
       allow: ['zh', 'en'],
     },
   };
