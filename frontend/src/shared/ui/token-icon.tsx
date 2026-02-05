@@ -11,11 +11,11 @@ interface TokenIconProps {
 
 export function TokenIcon({ symbol, size = 32, className }: TokenIconProps) {
   // 对于本地有图标的代币，使用本地图标
-  if (symbol === 'wstETH') {
+  if (symbol === 'weETH') {
     return (
       <Image
-        src="/resource/wstETH.svg"
-        alt="wstETH"
+        src="/resource/weETH.svg"
+        alt="weETH"
         width={size}
         height={size}
         className={className}

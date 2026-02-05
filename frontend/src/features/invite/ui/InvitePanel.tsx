@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAccount, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { Address } from 'viem';
 import { motion } from 'framer-motion';
@@ -37,6 +37,26 @@ export function InvitePanel() {
     })),
     query: { enabled: !!address && tokenList.length > 0 },
   });
+
+  // 查询每个 Hodlock 合约中的邀请人数
+  const refereeCountResults = useReadContracts({
+    contracts: tokenList.map((info) => ({
+      address: info.hodlockAddress,
+      abi: HODLOCK_ABI,
+      functionName: 'refereeCount',
+      args: address ? [address as Address] : undefined,
+    })),
+    query: { enabled: !!address && tokenList.length > 0 },
+  });
+
+  // 计算总邀请人数
+  const totalRefereeCount = useMemo(() => {
+    if (!refereeCountResults.data) return 0;
+    return refereeCountResults.data.reduce((sum, result) => {
+      const count = (result?.result as bigint) || 0n;
+      return sum + Number(count);
+    }, 0);
+  }, [refereeCountResults.data]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && address) {
@@ -100,6 +120,23 @@ export function InvitePanel() {
                 <Copy className="w-4 h-4" />
               )}
             </Button>
+          </div>
+
+          {/* 邀请统计 */}
+          <div className="p-4 bg-gradient-to-r from-pink-50 to-rose-50 rounded-xl border border-pink-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-pink-100 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-pink-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Successful Invites</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {refereeCountResults.isLoading ? '...' : totalRefereeCount}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="p-4 bg-pink-50 rounded-xl">

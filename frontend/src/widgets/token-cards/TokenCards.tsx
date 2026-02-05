@@ -16,12 +16,12 @@ const tokenCards = [
     localIconPath: '/resource/cbBTC.svg',
   },
   {
-    symbol: 'wstETH',
-    name: 'Wrapped stETH',
-    href: '/lock?token=wstETH',
+    symbol: 'weETH',
+    name: 'Wrapped eETH',
+    href: '/lock?token=weETH',
     gradient: 'from-rose-400 to-pink-500',
     hasLocalIcon: true,
-    localIconPath: '/resource/wstETH.svg',
+    localIconPath: '/resource/weETH.svg',
   },
   {
     symbol: 'other',

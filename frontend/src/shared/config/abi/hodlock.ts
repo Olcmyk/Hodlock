@@ -107,6 +107,13 @@ export const HODLOCK_ABI = [
     type: 'function',
   },
   {
+    inputs: [{ internalType: 'address', name: '', type: 'address' }],
+    name: 'refereeCount',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
     inputs: [],
     name: 'token',
     outputs: [{ internalType: 'contract IERC20', name: '', type: 'address' }],

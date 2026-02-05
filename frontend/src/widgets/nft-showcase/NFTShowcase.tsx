@@ -73,7 +73,7 @@ export function NFTShowcase() {
 
             <p className="text-gray-600 text-lg leading-relaxed mb-6">
               A certificate representing a locked token deposit in Hodlock protocol.
-              This NFT represents <span className="font-semibold text-gray-900">5 wstETH</span> locked
+              This NFT represents <span className="font-semibold text-gray-900">5 weETH</span> locked
               for <span className="font-semibold text-gray-900">365 days</span>.
             </p>
 

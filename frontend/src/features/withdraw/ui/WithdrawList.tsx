@@ -199,8 +199,8 @@ export function WithdrawList() {
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    {deposit.tokenSymbol === 'wstETH' ? (
-                      <Image src="/resource/wstETH.svg" alt="wstETH" width={40} height={40} />
+                    {deposit.tokenSymbol === 'weETH' ? (
+                      <Image src="/resource/weETH.svg" alt="weETH" width={40} height={40} />
                     ) : deposit.tokenSymbol === 'cbBTC' ? (
                       <Image src="/resource/cbBTC.svg" alt="cbBTC" width={40} height={40} />
                     ) : (
