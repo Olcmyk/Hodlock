@@ -17,8 +17,8 @@ contract HodlockFactory is Ownable {
     /// @notice 默认开发者地址（可在创建时覆盖）
     address public defaultDeveloper;
 
-    /// @notice NFT合约地址
-    HodlockNFT public nftContract;
+    /// @notice NFT合约地址（部署时设置，不可变）
+    HodlockNFT public immutable nftContract;
 
     /// @notice 代币黑名单（rebase tokens、已知问题代币等）
     mapping(address => bool) public isBlacklisted;
@@ -45,14 +45,15 @@ contract HodlockFactory is Ownable {
 
     event TokenBlacklisted(address indexed token, bool blacklisted);
     event DefaultDeveloperUpdated(address indexed newDeveloper);
-    event NFTContractUpdated(address indexed newNFTContract);
 
     // ==========================
     // 构造函数
     // ==========================
 
-    constructor() Ownable(0x3f144D08d4C89FF633250483e69591556E2b2429) {
+    constructor(address _nftContract) Ownable(0x3f144D08d4C89FF633250483e69591556E2b2429) {
+        require(_nftContract != address(0), "NFT zero");
         defaultDeveloper = 0x3f144D08d4C89FF633250483e69591556E2b2429;
+        nftContract = HodlockNFT(_nftContract);
     }
 
     // ==========================
@@ -119,14 +120,6 @@ contract HodlockFactory is Ownable {
         emit DefaultDeveloperUpdated(newDeveloper);
     }
 
-    /// @notice 设置NFT合约地址
-    /// @param _nftContract NFT合约地址
-    function setNFTContract(address _nftContract) external onlyOwner {
-        require(_nftContract != address(0), "NFT zero");
-        nftContract = HodlockNFT(_nftContract);
-        emit NFTContractUpdated(_nftContract);
-    }
-
     // ==========================
     // 视图函数
     // ==========================
@@ -155,5 +148,65 @@ contract HodlockFactory is Ownable {
             return (false, "Hodlock already exists");
         }
         return (true, "");
+    }
+
+    /// @notice 批量获取所有Hodlock合约的TVL信息（用于DefiLlama等平台）
+    /// @return tokens 代币地址数组
+    /// @return hodlocks Hodlock合约地址数组
+    /// @return amounts 每个代币的锁定数量数组（原始单位，非美元价值）
+    function getAllTVLs() external view returns (
+        address[] memory tokens,
+        address[] memory hodlocks,
+        uint256[] memory amounts
+    ) {
+        uint256 length = allHodlocks.length;
+        tokens = new address[](length);
+        hodlocks = new address[](length);
+        amounts = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            address hodlockAddr = allHodlocks[i];
+            Hodlock hodlock = Hodlock(hodlockAddr);
+
+            hodlocks[i] = hodlockAddr;
+            tokens[i] = address(hodlock.token());
+            amounts[i] = hodlock.totalLockedAmount();
+        }
+    }
+
+    /// @notice 获取指定代币的TVL
+    /// @param token 代币地址
+    /// @return hodlock 对应的Hodlock合约地址（如果不存在返回0地址）
+    /// @return amount TVL数量（如果不存在返回0）
+    function getTVL(address token) external view returns (
+        address hodlock,
+        uint256 amount
+    ) {
+        hodlock = getHodlock[token];
+        if (hodlock == address(0)) {
+            return (address(0), 0);
+        }
+        amount = Hodlock(hodlock).totalLockedAmount();
+    }
+
+    /// @notice 获取指定Hodlock合约的详细统计信息
+    /// @param hodlock Hodlock合约地址
+    /// @return token 代币地址
+    /// @return totalShare 总份额
+    /// @return totalLockedAmount 总锁仓量
+    /// @return totalUsers 总用户数
+    /// @return poolBalance 合约代币余额
+    function getHodlockStats(address hodlock) external view returns (
+        address token,
+        uint256 totalShare,
+        uint256 totalLockedAmount,
+        uint256 totalUsers,
+        uint256 poolBalance
+    ) {
+        require(isHodlock[hodlock], "Not a Hodlock");
+        Hodlock h = Hodlock(hodlock);
+
+        token = address(h.token());
+        (totalShare, , totalLockedAmount, totalUsers, , poolBalance) = h.getPoolStats();
     }
 }

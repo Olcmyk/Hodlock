@@ -100,6 +100,25 @@ contract Hodlock is Ownable, ReentrancyGuard {
     // 邀请人累积佣金（由提前取款罚金产生）
     mapping(address => uint256) public referrerRewards;
 
+    // ==========================
+    // 统计数据
+    // ==========================
+
+    // 总用户数
+    uint256 public totalUsers;
+
+    // 用户是否已注册（用于统计）
+    mapping(address => bool) public isUser;
+
+    // 总锁仓量（当前有效锁仓的代币总量）
+    uint256 public totalLockedAmount;
+
+    // 邀请人的被邀请人列表（反向映射）
+    mapping(address => address[]) public refereeList;
+
+    // 邀请人的被邀请人数量
+    mapping(address => uint256) public refereeCount;
+
 
     // ==========================
     // 事件定义
@@ -122,6 +141,9 @@ contract Hodlock is Ownable, ReentrancyGuard {
 
     // 邀请关系事件（便于 Dune 分析邀请网络）
     event ReferrerSet(address indexed user, address indexed referrer);
+
+    // 用户注册事件
+    event UserRegistered(address indexed user, address indexed referrer);
 
     // NFT 事件
     event NFTMinted(address indexed user, uint256 indexed depositId, uint256 tokenId);
@@ -192,6 +214,16 @@ contract Hodlock is Ownable, ReentrancyGuard {
         // 确定邀请人：如果是首次存款，则设置邀请人（永久绑定）
         address finalReferrer = _setReferrerIfFirst(msg.sender, referrer);
 
+        // 首次存款时注册用户
+        if (!isUser[msg.sender]) {
+            isUser[msg.sender] = true;
+            totalUsers++;
+            emit UserRegistered(msg.sender, finalReferrer);
+        }
+
+        // 更新总锁仓量
+        totalLockedAmount += actualAmount;
+
         // 计算解锁时间
         uint256 unlockTime = block.timestamp + lockSeconds;
 
@@ -260,6 +292,9 @@ contract Hodlock is Ownable, ReentrancyGuard {
         info.rewardDebt = 0;
         info.withdrawn = true;
 
+        // 更新总锁仓量
+        totalLockedAmount -= amount;
+
         // 转账（支持 fee-on-transfer tokens）
         uint256 transferAmount = amount + pending;
 
@@ -310,6 +345,9 @@ contract Hodlock is Ownable, ReentrancyGuard {
         info.share = 0;
         info.rewardDebt = 0;
         info.withdrawn = true;
+
+        // 更新总锁仓量
+        totalLockedAmount -= amount;
 
         uint256 rewardToPool = 0;
         uint256 toReferrer = 0;
@@ -366,9 +404,9 @@ contract Hodlock is Ownable, ReentrancyGuard {
         emit RewardPoolUpdated(penalty, forfeitedReward, rewardToPool, toReferrer, toDev);
         emit WithdrawEarly(msg.sender, depositId, amount, penalty, forfeitedReward);
 
-        // 销毁 NFT（外部调用）
-        if (shouldBurnNFT) {
-            nftContract.burn(msg.sender, depositId);
+        // 销毁 NFT（外部调用，失败不影响取款）
+        if (shouldBurnNFT && address(nftContract) != address(0)) {
+            try nftContract.burn(msg.sender, depositId) {} catch {}
         }
 
         // 转账（外部调用）
@@ -499,6 +537,93 @@ contract Hodlock is Ownable, ReentrancyGuard {
         return userDeposits[_user].length;
     }
 
+    /// @notice 获取用户汇总信息
+    /// @param _user 用户地址
+    /// @return totalAmount 用户总锁仓量
+    /// @return totalUserShare 用户总份额
+    /// @return totalPendingRewards 用户总待领奖励
+    /// @return depositCount 用户存单数量
+    function getUserSummary(address _user) external view returns (
+        uint256 totalAmount,
+        uint256 totalUserShare,
+        uint256 totalPendingRewards,
+        uint256 depositCount
+    ) {
+        DepositInfo[] storage deposits = userDeposits[_user];
+        depositCount = deposits.length;
+
+        for (uint256 i = 0; i < depositCount; i++) {
+            DepositInfo storage info = deposits[i];
+            if (!info.withdrawn && info.amount > 0) {
+                totalAmount += info.amount;
+                totalUserShare += info.share;
+                totalPendingRewards += _pendingReward(info);
+            }
+        }
+    }
+
+    /// @notice 获取存单完整信息
+    /// @param _user 用户地址
+    /// @param depositId 存单索引
+    /// @return info 存单信息结构体
+    /// @return pending 当前可领取奖励
+    /// @return isUnlocked 是否已解锁
+    function getDepositInfo(address _user, uint256 depositId) external view returns (
+        DepositInfo memory info,
+        uint256 pending,
+        bool isUnlocked
+    ) {
+        require(depositId < userDeposits[_user].length, "Invalid id");
+        info = userDeposits[_user][depositId];
+        pending = _pendingReward(userDeposits[_user][depositId]);
+        isUnlocked = block.timestamp >= info.unlockTimestamp;
+    }
+
+    /// @notice 获取全局池子统计
+    /// @return _totalShare 总份额
+    /// @return _accTokenPerShare 累计每股奖励
+    /// @return _totalLockedAmount 总锁仓量
+    /// @return _totalUsers 总用户数
+    /// @return _devBalance 开发者待提取余额
+    /// @return poolBalance 合约代币余额
+    function getPoolStats() external view returns (
+        uint256 _totalShare,
+        uint256 _accTokenPerShare,
+        uint256 _totalLockedAmount,
+        uint256 _totalUsers,
+        uint256 _devBalance,
+        uint256 poolBalance
+    ) {
+        _totalShare = totalShare;
+        _accTokenPerShare = accTokenPerShare;
+        _totalLockedAmount = totalLockedAmount;
+        _totalUsers = totalUsers;
+        _devBalance = devBalance;
+        poolBalance = token.balanceOf(address(this));
+    }
+
+    /// @notice 获取邀请人统计信息
+    /// @param _referrer 邀请人地址
+    /// @return _refereeCount 被邀请人数量
+    /// @return _referrerRewards 累积邀请奖励
+    /// @return _refereeAddresses 被邀请人地址列表
+    function getReferrerStats(address _referrer) external view returns (
+        uint256 _refereeCount,
+        uint256 _referrerRewards,
+        address[] memory _refereeAddresses
+    ) {
+        _refereeCount = refereeCount[_referrer];
+        _referrerRewards = referrerRewards[_referrer];
+        _refereeAddresses = refereeList[_referrer];
+    }
+
+    /// @notice 获取用户的邀请人信息
+    /// @param _user 用户地址
+    /// @return referrer 邀请人地址
+    function getUserReferrer(address _user) external view returns (address referrer) {
+        referrer = userReferrer[_user];
+    }
+
     // ==========================
     // 内部/私有工具函数
     // ==========================
@@ -548,6 +673,9 @@ contract Hodlock is Ownable, ReentrancyGuard {
         // 首次存款，设置邀请人
         if (referrer != address(0) && referrer != user) {
             userReferrer[user] = referrer;
+            // 更新反向映射
+            refereeList[referrer].push(user);
+            refereeCount[referrer]++;
             emit ReferrerSet(user, referrer);
             return referrer;
         }
