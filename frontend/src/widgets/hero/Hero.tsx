@@ -18,15 +18,14 @@ export function Hero() {
           transition={{ duration: 0.6 }}
         >
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-            Principal-Protected{' '}
             <span className="bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent">
               On-Chain CD
-            </span>
+            </span>{' '}
+            with 100% Principal Protection
           </h1>
 
           <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
-            Lock your tokens, earn rewards from paper hands. 100% principal protected,
-            no Ponzi schemes, just pure diamond hand rewards.
+            Lock tokens. Earn from early exits. Principal always safe.
           </p>
 
           <Link href="/lock">

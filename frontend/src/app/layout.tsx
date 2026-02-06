@@ -19,8 +19,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Hodlock - Principal-Protected On-Chain CD',
-  description: 'Lock your tokens, earn rewards from paper hands. 100% principal protected, no Ponzi schemes.',
+  title: 'Hodlock - On-Chain CD with 100% Principal Protection',
+  description: 'Lock tokens. Earn from early exits. Principal always safe.',
   icons: {
     icon: '/favicon.ico',
   },

@@ -1,12 +1,14 @@
 # Hodlock 🚀
 
+![Hodlock Banner](images/banner.jpg)
+
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://opensource.org/licenses/AGPL-3.0)
 [![Ethereum](https://img.shields.io/badge/Chain-Base%20(Ethereum%20L2)-3C3C3D.svg)](https://base.org)
 [![DeFi](https://img.shields.io/badge/Category-DeFi-brightgreen)](https://defillama.com)
 [![X (Twitter)](https://img.shields.io/badge/X-%40hodlockfi-1DA1F2?logo=x&logoColor=white)](https://x.com/hodlockfi)
 
-**Principal-Protected On-Chain CD**  
-**Lock your tokens. Earn from paper hands. Keep 100% of your principal — always.**
+**On-Chain CD with 100% Principal Protection**
+**Lock tokens. Earn from early exits. Principal always safe.**
 
 Hodlock is a revolutionary DeFi protocol that brings the safety of traditional Certificates of Deposit (CDs) to the blockchain — with real, sustainable yield.
 
