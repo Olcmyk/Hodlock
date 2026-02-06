@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { Web3Provider } from '@/features/wallet';
 import { Header } from '@/widgets/header';
@@ -37,7 +38,9 @@ export default function RootLayout({
       >
         <Web3Provider>
           <TooltipProvider>
-            <ReferralCapture />
+            <Suspense fallback={null}>
+              <ReferralCapture />
+            </Suspense>
             <Header />
             <main className="pt-16 min-h-screen">
               {children}
