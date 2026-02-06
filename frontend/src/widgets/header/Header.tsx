@@ -28,7 +28,7 @@ export function Header() {
               <div className="p-1.5 rounded-xl bg-transparent group-hover:bg-pink-50 transition-colors">
                 <Lock className="h-7 w-7 text-pink-500" strokeWidth={2.5} />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent">
+              <span className="text-xl font-bold text-pink-500">
                 Hodlock
               </span>
             </Link>
