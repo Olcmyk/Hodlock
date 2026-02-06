@@ -65,10 +65,7 @@ export function NFTShowcase() {
             transition={{ duration: 0.6 }}
           >
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6">
-              Hodlock Certificate{' '}
-              <span className="bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent">
-                #1
-              </span>
+              Hodlock Certificate
             </h2>
 
             <p className="text-gray-600 text-lg leading-relaxed mb-6">

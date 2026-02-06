@@ -24,9 +24,9 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2 group">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-500/25 group-hover:shadow-pink-500/40 transition-shadow">
-                <Lock className="h-5 w-5" />
+            <Link href="/" className="flex items-center gap-0.5 group">
+              <div className="p-1.5 rounded-xl bg-transparent group-hover:bg-pink-50 transition-colors">
+                <Lock className="h-7 w-7 text-pink-500" strokeWidth={2.5} />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent">
                 Hodlock
