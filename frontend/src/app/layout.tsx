@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   title: 'Hodlock - On-Chain CD with 100% Principal Protection',
   description: 'Lock tokens. Earn from early exits. Principal always safe.',
   icons: {
-    icon: '/favicon.ico',
+    icon: '/hodlock-logo.svg',
   },
 };
 
