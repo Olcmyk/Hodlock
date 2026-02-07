@@ -12,6 +12,10 @@ interface IHodlockFactory {
     function isHodlock(address hodlock) external view returns (bool);
 }
 
+interface IReverseRegistrar {
+    function setName(string memory name) external returns (bytes32);
+}
+
 /// @title HodlockNFT
 /// @notice 锁仓凭证NFT，锁仓期间为SBT（不可转让），到期后可交易
 contract HodlockNFT is ERC721, Ownable {
@@ -93,6 +97,13 @@ contract HodlockNFT is ERC721, Ownable {
         require(_renderer != address(0), "Zero address");
         renderer = IHodlockNFTRenderer(_renderer);
         emit RendererUpdated(_renderer);
+    }
+
+    /// @notice 设置 Base 链 ENS 反向解析名称（仅 Owner 可调用）
+    /// @param name 域名，如 "nft.hodlock.base.eth"
+    function setBaseName(string calldata name) external onlyOwner {
+        // Base 主网 L2 Reverse Registrar 地址
+        IReverseRegistrar(0x79EA96012eEa67A83431F1701B3dFf7e37F9E282).setName(name);
     }
 
     // ==========================

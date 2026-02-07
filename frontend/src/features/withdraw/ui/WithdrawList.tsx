@@ -67,7 +67,7 @@ export function WithdrawList() {
             }) as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, boolean];
 
             if (!deposit[7]) {
-              // 查询该存单是否已铸造 NFT
+              // Check if this deposit has minted NFT
               const hasNFT = await publicClient.readContract({
                 address: info.hodlockAddress,
                 abi: HODLOCK_ABI,

@@ -87,7 +87,7 @@ export function SwapWidget({ toToken, fromChain, toChain }: SwapWidgetProps) {
       <div className="w-full h-[600px] flex items-center justify-center bg-white rounded-2xl">
         <div className="text-center">
           <div className="w-8 h-8 mx-auto mb-2 rounded-full border-2 border-gray-200 border-t-gray-500 animate-spin" />
-          <p className="text-sm text-gray-500">加载交换组件中...</p>
+          <p className="text-sm text-gray-500">Loading swap widget...</p>
         </div>
       </div>
     );
@@ -98,7 +98,7 @@ export function SwapWidget({ toToken, fromChain, toChain }: SwapWidgetProps) {
       <div className="w-full h-[600px] flex items-center justify-center bg-white rounded-2xl">
         <div className="text-center">
           <p className="text-sm text-gray-500">
-            {!isConnected ? '请先连接钱包以使用换币功能' : '正在连接钱包...'}
+            {!isConnected ? 'Please connect your wallet to use swap' : 'Connecting wallet...'}
           </p>
         </div>
       </div>
@@ -144,20 +144,6 @@ export function SwapWidget({ toToken, fromChain, toChain }: SwapWidgetProps) {
         <LiFiWidgetComponent integrator={LIFI_INTEGRATION_ID} config={widgetConfig} />
       </div>
 
-      {/* Powered by footer */}
-      <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-        <span>Powered by</span>
-        <a
-          href="https://li.fi"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-semibold text-pink-500 hover:text-pink-400 transition-colors"
-        >
-          LiFi Protocol
-        </a>
-        <span>·</span>
-        <span>与 Jumper Exchange 相同的技术</span>
-      </div>
     </div>
   );
 }

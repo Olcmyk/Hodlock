@@ -1,10 +1,13 @@
 import { Address } from 'viem';
 
 export const CONTRACTS = {
-  HodlockNFT: '0x174763ee3575a61a9587Adc02C53c1Ac7BD657C6' as Address,
+  HodlockNFT: '0x1c57E323Dde9AE07431eda38E4E017Ee893d2fe3' as Address,
   HodlockNFTRender: '0xc3E6330Be8dc7493b2907A45992dEed41fF9Ea23' as Address,
-  HodlockFactory: '0xb0294707A2f3dAaA44137D10B44736a893FACF65' as Address,
+  HodlockFactory: '0x1CCe8B4c322BEEA28bb3CDe106C9593014918870' as Address,
 } as const;
+
+// Fee required to create a Hodlock contract (0.001 ETH)
+export const CREATE_HODLOCK_FEE = 0.001;
 
 export const HODLOCK_CONTRACTS = {
   cbBTC: '0x2c0bb20849aA526c728cEf6AAb5F08C1e4254b63' as Address,

@@ -25,7 +25,7 @@ export function InvitePanel() {
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash });
 
-  // 使用动态获取的 Hodlock 列表
+  // Use dynamically fetched Hodlock list
   const { tokenList, isLoading: isLoadingTokens } = useAllHodlocks();
 
   const referrerRewardsResults = useReadContracts({
@@ -38,7 +38,7 @@ export function InvitePanel() {
     query: { enabled: !!address && tokenList.length > 0 },
   });
 
-  // 查询每个 Hodlock 合约中的邀请人数
+  // Query referee count for each Hodlock contract
   const refereeCountResults = useReadContracts({
     contracts: tokenList.map((info) => ({
       address: info.hodlockAddress,
@@ -49,7 +49,7 @@ export function InvitePanel() {
     query: { enabled: !!address && tokenList.length > 0 },
   });
 
-  // 计算总邀请人数
+  // Calculate total referee count
   const totalRefereeCount = useMemo(() => {
     if (!refereeCountResults.data) return 0;
     return refereeCountResults.data.reduce((sum, result) => {
@@ -122,7 +122,7 @@ export function InvitePanel() {
             </Button>
           </div>
 
-          {/* 邀请统计 */}
+          {/* Invite Statistics */}
           <div className="p-4 bg-gradient-to-r from-pink-50 to-rose-50 rounded-xl border border-pink-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

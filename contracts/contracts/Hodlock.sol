@@ -19,6 +19,10 @@ interface IHodlockNFT {
     function burn(address holder, uint256 depositId) external;
 }
 
+interface IReverseRegistrar {
+    function setName(string memory name) external returns (bytes32);
+}
+
 contract Hodlock is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -514,6 +518,13 @@ contract Hodlock is Ownable, ReentrancyGuard {
         require(pendingReferrerFeeBps.pending, "No pending change");
         pendingReferrerFeeBps.pending = false;
         emit ReferrerFeeBpsCancelled();
+    }
+
+    /// @notice 设置 Base 链 ENS 反向解析名称（仅 Owner 可调用）
+    /// @param name 域名，如 "cbbtc.hodlock.base.eth"
+    function setBaseName(string calldata name) external onlyOwner {
+        // Base 主网 L2 Reverse Registrar 地址
+        IReverseRegistrar(0x79EA96012eEa67A83431F1701B3dFf7e37F9E282).setName(name);
     }
 
 

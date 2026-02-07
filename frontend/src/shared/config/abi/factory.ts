@@ -3,7 +3,14 @@ export const FACTORY_ABI = [
     inputs: [{ internalType: 'address', name: 'token', type: 'address' }],
     name: 'createHodlock',
     outputs: [{ internalType: 'address', name: 'hodlock', type: 'address' }],
-    stateMutability: 'nonpayable',
+    stateMutability: 'payable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'createFee',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
     type: 'function',
   },
   {

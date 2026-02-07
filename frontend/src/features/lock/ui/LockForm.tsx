@@ -25,7 +25,8 @@ import {
   TokenIcon,
 } from '@/shared/ui';
 import { HODLOCK_ABI, ERC20_ABI, FACTORY_ABI } from '@/shared/config/abi';
-import { CONTRACTS } from '@/shared/config/contracts';
+import { CONTRACTS, CREATE_HODLOCK_FEE } from '@/shared/config/contracts';
+import { isTokenWhitelisted } from '@/shared/config/whitelist';
 import { useAllHodlocks } from '@/shared/hooks';
 import { formatAmount, calculateUnlockDate, cn } from '@/shared/lib/utils';
 import { getReferrer } from '@/shared/components/ReferralCapture';
@@ -46,7 +47,7 @@ const PENALTY_OPTIONS = [
   { label: 'Custom', value: 0 },
 ];
 
-// 交易流程步骤
+// Transaction flow steps
 type TransactionStep = 'idle' | 'approving' | 'depositing' | 'minting' | 'done';
 
 export function LockForm() {
@@ -67,8 +68,9 @@ export function LockForm() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateContract, setShowCreateContract] = useState(false);
   const [newTokenAddress, setNewTokenAddress] = useState('');
+  const [createContractError, setCreateContractError] = useState('');
 
-  // 交易流程状态
+  // Transaction flow state
   const [txStep, setTxStep] = useState<TransactionStep>('idle');
   const [depositCountBefore, setDepositCountBefore] = useState<bigint | null>(null);
   const [startedWithApproval, setStartedWithApproval] = useState(false);
@@ -76,14 +78,14 @@ export function LockForm() {
   const { writeContract, data: hash, isPending, reset: resetWrite } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  // 使用动态获取的 Hodlock 列表
+  // Use dynamically fetched Hodlock list
   const { tokens, tokenList, isLoading: isLoadingTokens, refetch } = useAllHodlocks();
 
   const tokenInfo = tokens[selectedToken];
   const hodlockAddress = tokenInfo?.hodlockAddress;
   const tokenAddress = tokenInfo?.tokenAddress;
 
-  // 设置默认选中的代币
+  // Set default selected token
   useEffect(() => {
     if (tokenList.length > 0 && !selectedToken) {
       setSelectedToken(tokenList[0].symbol);
@@ -113,7 +115,7 @@ export function LockForm() {
     query: { enabled: !!address && !!tokenAddress && !!hodlockAddress },
   });
 
-  // 获取用户当前存单数量（用于计算新存单的 depositId）
+  // Get user's current deposit count (for calculating new deposit's depositId)
   const { data: depositCount, refetch: refetchDepositCount } = useReadContract({
     address: hodlockAddress,
     abi: HODLOCK_ABI,
@@ -151,20 +153,20 @@ export function LockForm() {
 
   const needsApproval = allowance !== undefined && amountInWei > 0n && allowance < amountInWei;
 
-  // 处理交易流程
+  // Handle transaction flow
   const handleSubmit = async () => {
     if (!hodlockAddress || !amountInWei || !tokenAddress) return;
 
-    // 记录当前存单数量（用于后续获取新存单的 depositId）
+    // Record current deposit count (for getting new deposit's depositId later)
     if (depositCount !== undefined) {
       setDepositCountBefore(depositCount);
     }
 
-    // 记录开始时是否需要 approve
+    // Record whether approval is needed at start
     setStartedWithApproval(needsApproval);
 
     if (needsApproval) {
-      // 需要先 approve
+      // Need to approve first
       setTxStep('approving');
       writeContract({
         address: tokenAddress,
@@ -173,7 +175,7 @@ export function LockForm() {
         args: [hodlockAddress, maxUint256],
       });
     } else {
-      // 不需要 approve，直接 deposit
+      // No approval needed, deposit directly
       setTxStep('depositing');
       const lockSeconds = BigInt(actualLockDays * 86400);
       writeContract({
@@ -185,13 +187,13 @@ export function LockForm() {
     }
   };
 
-  // 监听交易成功，执行下一步
+  // Watch for transaction success, execute next step
   useEffect(() => {
     if (!isSuccess) return;
 
     const executeNextStep = async () => {
       if (txStep === 'approving') {
-        // Approve 成功，刷新 allowance 并执行 deposit
+        // Approve success, refresh allowance and execute deposit
         await refetchAllowance();
         resetWrite();
         setTxStep('depositing');
@@ -203,13 +205,13 @@ export function LockForm() {
           args: [amountInWei, lockSeconds, BigInt(actualPenaltyBps), referrer as Address],
         });
       } else if (txStep === 'depositing') {
-        // Deposit 成功
+        // Deposit success
         if (mintNFT) {
-          // 需要铸造 NFT
+          // Need to mint NFT
           await refetchDepositCount();
           resetWrite();
           setTxStep('minting');
-          // 新存单的 depositId 就是之前的存单数量（因为索引从 0 开始）
+          // New deposit's depositId is the previous deposit count (since index starts from 0)
           const newDepositId = depositCountBefore ?? 0n;
           writeContract({
             address: hodlockAddress!,
@@ -218,12 +220,12 @@ export function LockForm() {
             args: [newDepositId],
           });
         } else {
-          // 不需要铸造 NFT，流程完成
+          // No NFT minting needed, flow complete
           setTxStep('done');
           setAmount('');
         }
       } else if (txStep === 'minting') {
-        // Mint NFT 成功，流程完成
+        // Mint NFT success, flow complete
         setTxStep('done');
         setAmount('');
       }
@@ -232,7 +234,7 @@ export function LockForm() {
     executeNextStep();
   }, [isSuccess, txStep]);
 
-  // 重置状态当用户改变输入时
+  // Reset state when user changes input
   useEffect(() => {
     if (txStep === 'done') {
       setTxStep('idle');
@@ -254,15 +256,24 @@ export function LockForm() {
 
   const handleCreateContract = () => {
     if (!newTokenAddress) return;
+
+    // Validate token address is in whitelist
+    if (!isTokenWhitelisted(newTokenAddress)) {
+      setCreateContractError('This token is not in the whitelist. Only Base chain top 500 tokens by market cap are supported.');
+      return;
+    }
+
+    setCreateContractError('');
     writeContract({
       address: CONTRACTS.HodlockFactory,
       abi: FACTORY_ABI,
       functionName: 'createHodlock',
       args: [newTokenAddress as Address],
+      value: parseUnits(String(CREATE_HODLOCK_FEE), 18),
     });
   };
 
-  // 创建合约成功后刷新列表
+  // Refresh list after contract creation success
   useEffect(() => {
     if (isSuccess && txStep === 'idle') {
       refetch();
@@ -575,26 +586,50 @@ export function LockForm() {
       </Dialog>
 
       {/* Create Contract Dialog */}
-      <Dialog open={showCreateContract} onOpenChange={setShowCreateContract}>
+      <Dialog open={showCreateContract} onOpenChange={(open) => {
+        setShowCreateContract(open);
+        if (!open) {
+          setCreateContractError('');
+          setNewTokenAddress('');
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Hodlock Contract</DialogTitle>
             <DialogDescription>
-              Enter the token address to create a new Hodlock contract for it
+              Enter the token address to create a new Hodlock contract for it.
+              Only Base chain top 500 tokens by market cap are supported.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-700">
+                  <p className="font-medium">Fee Required</p>
+                  <p>Creating a new Hodlock contract requires a fee of <span className="font-bold">{CREATE_HODLOCK_FEE} ETH</span>.</p>
+                </div>
+              </div>
+            </div>
             <Input
               placeholder="Token address (0x...)"
               value={newTokenAddress}
-              onChange={(e) => setNewTokenAddress(e.target.value)}
+              onChange={(e) => {
+                setNewTokenAddress(e.target.value);
+                setCreateContractError('');
+              }}
             />
+            {createContractError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{createContractError}</p>
+              </div>
+            )}
             <Button
               className="w-full"
               onClick={handleCreateContract}
               disabled={!newTokenAddress || isPending}
             >
-              {isPending ? 'Creating...' : 'Create Contract'}
+              {isPending ? 'Creating...' : `Create Contract (${CREATE_HODLOCK_FEE} ETH)`}
             </Button>
           </div>
         </DialogContent>

@@ -4,6 +4,7 @@ import { useReadContract, useReadContracts } from 'wagmi';
 import { Address } from 'viem';
 import { FACTORY_ABI, HODLOCK_ABI, ERC20_ABI } from '@/shared/config/abi';
 import { CONTRACTS } from '@/shared/config/contracts';
+import { isTokenWhitelisted } from '@/shared/config/whitelist';
 
 export interface TokenInfo {
   symbol: string;
@@ -22,7 +23,7 @@ export interface UseAllHodlocksResult {
 }
 
 export function useAllHodlocks(): UseAllHodlocksResult {
-  // 1. 获取 Hodlock 合约总数
+  // 1. Get total Hodlock contract count
   const { data: hodlocksLength, refetch: refetchLength } = useReadContract({
     address: CONTRACTS.HodlockFactory,
     abi: FACTORY_ABI,
@@ -31,7 +32,7 @@ export function useAllHodlocks(): UseAllHodlocksResult {
 
   const length = hodlocksLength ? Number(hodlocksLength) : 0;
 
-  // 2. 获取所有 Hodlock 合约地址
+  // 2. Get all Hodlock contract addresses
   const hodlockAddressesResult = useReadContracts({
     contracts: Array.from({ length }, (_, i) => ({
       address: CONTRACTS.HodlockFactory,
@@ -46,7 +47,7 @@ export function useAllHodlocks(): UseAllHodlocksResult {
     .map((r) => r.result as Address | undefined)
     .filter((addr): addr is Address => !!addr);
 
-  // 3. 获取每个 Hodlock 合约对应的 token 地址
+  // 3. Get token address for each Hodlock contract
   const tokenAddressesResult = useReadContracts({
     contracts: hodlockAddresses.map((addr) => ({
       address: addr,
@@ -60,7 +61,7 @@ export function useAllHodlocks(): UseAllHodlocksResult {
     .map((r) => r.result as Address | undefined)
     .filter((addr): addr is Address => !!addr);
 
-  // 4. 获取每个 token 的 symbol, name, decimals
+  // 4. Get symbol, name, decimals for each token
   const tokenInfoResult = useReadContracts({
     contracts: tokenAddresses.flatMap((addr) => [
       { address: addr, abi: ERC20_ABI, functionName: 'symbol' },
@@ -70,12 +71,19 @@ export function useAllHodlocks(): UseAllHodlocksResult {
     query: { enabled: tokenAddresses.length > 0 },
   });
 
-  // 5. 组装结果
+  // 5. Assemble results (only include whitelisted tokens)
   const tokens: Record<string, TokenInfo> = {};
   const tokenList: TokenInfo[] = [];
 
   if (tokenInfoResult.data && tokenAddresses.length > 0) {
     for (let i = 0; i < tokenAddresses.length; i++) {
+      const tokenAddress = tokenAddresses[i];
+
+      // Only add whitelisted tokens
+      if (!isTokenWhitelisted(tokenAddress)) {
+        continue;
+      }
+
       const symbolResult = tokenInfoResult.data[i * 3];
       const nameResult = tokenInfoResult.data[i * 3 + 1];
       const decimalsResult = tokenInfoResult.data[i * 3 + 2];

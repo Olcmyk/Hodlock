@@ -10,7 +10,7 @@ interface TokenIconProps {
 }
 
 export function TokenIcon({ symbol, size = 32, className }: TokenIconProps) {
-  // 对于本地有图标的代币，使用本地图标
+  // For tokens with local icons, use local icon
   if (symbol === 'weETH') {
     return (
       <Image
@@ -35,7 +35,7 @@ export function TokenIcon({ symbol, size = 32, className }: TokenIconProps) {
     );
   }
 
-  // 其他代币使用 @token-icons/react
+  // Other tokens use @token-icons/react
   return (
     <BaseTokenIcon
       symbol={symbol}
