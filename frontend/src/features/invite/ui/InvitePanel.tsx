@@ -28,6 +28,10 @@ export function InvitePanel() {
   // Use dynamically fetched Hodlock list
   const { tokenList, isLoading: isLoadingTokens } = useAllHodlocks();
 
+  if (typeof window !== 'undefined') {
+    console.log('[InvitePanel] tokenList:', tokenList.length, 'tokens, isLoading:', isLoadingTokens);
+  }
+
   const referrerRewardsResults = useReadContracts({
     contracts: tokenList.map((info) => ({
       address: info.hodlockAddress,
@@ -162,54 +166,54 @@ export function InvitePanel() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {tokenList.map((info, index) => {
-            const rewardResult = referrerRewardsResults.data?.[index];
-            const reward = (rewardResult?.result as bigint) || 0n;
-            const hasReward = reward > 0n;
-
-            return (
-              <motion.div
-                key={info.symbol}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className={cn(
-                  'flex items-center justify-between p-4 rounded-xl border',
-                  hasReward ? 'border-pink-200 bg-pink-50/50' : 'border-gray-100 bg-gray-50/50'
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <TokenIcon symbol={info.symbol} size={32} />
-                  <div>
-                    <p className="font-medium text-gray-900">{info.symbol}</p>
-                    <p className="text-sm text-gray-500">
-                      {formatAmount(reward, info.decimals)} available
-                    </p>
-                  </div>
-                </div>
-
-                <Button
-                  size="sm"
-                  disabled={!hasReward || isPending || isConfirming}
-                  onClick={() => handleClaimRewards(info.hodlockAddress)}
-                >
-                  {isPending || isConfirming ? 'Claiming...' : 'Claim'}
-                </Button>
-              </motion.div>
-            );
-          })}
-
-          {(referrerRewardsResults.isLoading || isLoadingTokens) && (
-            <div className="text-center py-4">
+          {isLoadingTokens ? (
+            <div className="text-center py-8">
               <div className="w-8 h-8 mx-auto mb-2 rounded-full border-2 border-pink-200 border-t-pink-500 animate-spin" />
-              <p className="text-sm text-gray-500">Loading rewards...</p>
+              <p className="text-sm text-gray-500">Loading contracts...</p>
             </div>
-          )}
-
-          {!isLoadingTokens && tokenList.length === 0 && (
-            <div className="text-center py-4">
+          ) : tokenList.length === 0 ? (
+            <div className="text-center py-8">
               <p className="text-sm text-gray-500">No Hodlock contracts found</p>
             </div>
+          ) : (
+            <>
+              {tokenList.map((info, index) => {
+                const rewardResult = referrerRewardsResults.data?.[index];
+                const reward = (rewardResult?.result as bigint) || 0n;
+                const hasReward = reward > 0n;
+
+                return (
+                  <motion.div
+                    key={info.symbol}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className={cn(
+                      'flex items-center justify-between p-4 rounded-xl border',
+                      hasReward ? 'border-pink-200 bg-pink-50/50' : 'border-gray-100 bg-gray-50/50'
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <TokenIcon symbol={info.symbol} size={32} />
+                      <div>
+                        <p className="font-medium text-gray-900">{info.symbol}</p>
+                        <p className="text-sm text-gray-500">
+                          {referrerRewardsResults.isLoading ? '...' : formatAmount(reward, info.decimals)} available
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      disabled={!hasReward || isPending || isConfirming}
+                      onClick={() => handleClaimRewards(info.hodlockAddress)}
+                    >
+                      {isPending || isConfirming ? 'Claiming...' : 'Claim'}
+                    </Button>
+                  </motion.div>
+                );
+              })}
+            </>
           )}
         </CardContent>
       </Card>
