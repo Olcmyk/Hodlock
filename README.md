@@ -6,6 +6,7 @@
 [![Ethereum](https://img.shields.io/badge/Chain-Base%20(Ethereum%20L2)-3C3C3D.svg)](https://base.org)
 [![DeFi](https://img.shields.io/badge/Category-DeFi-brightgreen)](https://defillama.com)
 [![X (Twitter)](https://img.shields.io/badge/X-%40hodlockfi-1DA1F2?logo=x&logoColor=white)](https://x.com/hodlockfi)
+[![ENS](https://img.shields.io/badge/ENS-hodlock.eth-blue?logo=ethereum&logoColor=white)](https://hodlock.eth.limo)
 
 **On-Chain CD with 100% Principal Protection**
 **Lock tokens. Earn from early exits. Principal always safe.**
