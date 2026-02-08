@@ -46,132 +46,163 @@ export function WithdrawList() {
   // Use dynamically fetched Hodlock list from factory
   const { tokenList, isLoading: isLoadingTokens } = useAllHodlocks();
 
+  // Track if we've already fetched to avoid re-fetching on tokenList changes
+  const fetchedRef = useRef(false);
+  const lastTokenListRef = useRef<string>('');
+
   const fetchDeposits = useCallback(async () => {
     if (!address || !publicClient || tokenList.length === 0) return;
 
     setLoading(true);
     const allDeposits: DepositWithMeta[] = [];
 
-    // First, get deposit counts for all tokens in parallel
-    const countResults = await Promise.allSettled(
-      tokenList.map(info =>
-        publicClient.readContract({
-          address: info.hodlockAddress,
-          abi: HODLOCK_ABI,
-          functionName: 'getDepositCount',
-          args: [address as Address],
-        })
-      )
-    );
-
-    // Build list of deposit fetch tasks
-    const depositFetchTasks: Array<{
-      info: typeof tokenList[0];
-      depositIndex: number;
-    }> = [];
-
-    for (let i = 0; i < countResults.length; i++) {
-      const result = countResults[i];
-      if (result.status === 'fulfilled') {
-        const count = Number(result.value);
-        const info = tokenList[i];
-        for (let j = 0; j < count; j++) {
-          depositFetchTasks.push({ info, depositIndex: j });
-        }
-      }
-    }
-
-    // Fetch all deposits in parallel (with batching to avoid rate limits)
-    const batchSize = 10;
-    for (let i = 0; i < depositFetchTasks.length; i += batchSize) {
-      const batch = depositFetchTasks.slice(i, i + batchSize);
-
-      const depositResults = await Promise.allSettled(
-        batch.map(({ info, depositIndex }) =>
+    try {
+      // First, get deposit counts for all tokens in parallel
+      const countResults = await Promise.allSettled(
+        tokenList.map(info =>
           publicClient.readContract({
             address: info.hodlockAddress,
             abi: HODLOCK_ABI,
-            functionName: 'userDeposits',
-            args: [address as Address, BigInt(depositIndex)],
+            functionName: 'getDepositCount',
+            args: [address as Address],
           })
         )
       );
 
-      // Fetch NFT status for non-withdrawn deposits
-      const nftFetchTasks: Array<{
-        batchIndex: number;
+      // Build list of deposit fetch tasks (only for tokens with deposits)
+      const depositFetchTasks: Array<{
         info: typeof tokenList[0];
         depositIndex: number;
-        deposit: any;
       }> = [];
 
-      for (let j = 0; j < depositResults.length; j++) {
-        const result = depositResults[j];
+      for (let i = 0; i < countResults.length; i++) {
+        const result = countResults[i];
         if (result.status === 'fulfilled') {
-          const deposit = result.value as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, boolean];
-          if (!deposit[7]) {
-            // Not withdrawn, check NFT status
-            nftFetchTasks.push({
-              batchIndex: j,
-              info: batch[j].info,
-              depositIndex: batch[j].depositIndex,
-              deposit,
-            });
+          const count = Number(result.value);
+          if (count > 0) {
+            const info = tokenList[i];
+            for (let j = 0; j < count; j++) {
+              depositFetchTasks.push({ info, depositIndex: j });
+            }
           }
         }
       }
 
-      // Fetch NFT statuses in parallel
-      const nftResults = await Promise.allSettled(
-        nftFetchTasks.map(({ info, depositIndex }) =>
-          publicClient.readContract({
-            address: info.hodlockAddress,
-            abi: HODLOCK_ABI,
-            functionName: 'hasNFT',
-            args: [address as Address, BigInt(depositIndex)],
-          })
-        )
-      );
-
-      // Add deposits to results
-      for (let j = 0; j < nftFetchTasks.length; j++) {
-        const { info, depositIndex, deposit } = nftFetchTasks[j];
-        const nftResult = nftResults[j];
-        const hasNFT = nftResult.status === 'fulfilled' ? (nftResult.value as boolean) : false;
-
-        allDeposits.push({
-          amount: deposit[0],
-          originalAmount: deposit[1],
-          share: deposit[2],
-          rewardDebt: deposit[3],
-          depositTimestamp: deposit[4],
-          unlockTimestamp: deposit[5],
-          penaltyBps: deposit[6],
-          withdrawn: deposit[7],
-          depositId: depositIndex,
-          tokenSymbol: info.symbol,
-          hodlockAddress: info.hodlockAddress,
-          hasNFT,
-          decimals: info.decimals,
-        });
+      // If no deposits, finish early
+      if (depositFetchTasks.length === 0) {
+        setDeposits([]);
+        setLoading(false);
+        return;
       }
 
-      // Add small delay between batches to avoid rate limiting
-      if (i + batchSize < depositFetchTasks.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      // Fetch all deposits in parallel (with batching to avoid rate limits)
+      const batchSize = 10;
+      for (let i = 0; i < depositFetchTasks.length; i += batchSize) {
+        const batch = depositFetchTasks.slice(i, i + batchSize);
+
+        const depositResults = await Promise.allSettled(
+          batch.map(({ info, depositIndex }) =>
+            publicClient.readContract({
+              address: info.hodlockAddress,
+              abi: HODLOCK_ABI,
+              functionName: 'userDeposits',
+              args: [address as Address, BigInt(depositIndex)],
+            })
+          )
+        );
+
+        // Fetch NFT status for non-withdrawn deposits
+        const nftFetchTasks: Array<{
+          batchIndex: number;
+          info: typeof tokenList[0];
+          depositIndex: number;
+          deposit: any;
+        }> = [];
+
+        for (let j = 0; j < depositResults.length; j++) {
+          const result = depositResults[j];
+          if (result.status === 'fulfilled') {
+            const deposit = result.value as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, boolean];
+            if (!deposit[7]) {
+              // Not withdrawn, check NFT status
+              nftFetchTasks.push({
+                batchIndex: j,
+                info: batch[j].info,
+                depositIndex: batch[j].depositIndex,
+                deposit,
+              });
+            }
+          }
+        }
+
+        // Fetch NFT statuses in parallel
+        const nftResults = await Promise.allSettled(
+          nftFetchTasks.map(({ info, depositIndex }) =>
+            publicClient.readContract({
+              address: info.hodlockAddress,
+              abi: HODLOCK_ABI,
+              functionName: 'hasNFT',
+              args: [address as Address, BigInt(depositIndex)],
+            })
+          )
+        );
+
+        // Add deposits to results
+        for (let j = 0; j < nftFetchTasks.length; j++) {
+          const { info, depositIndex, deposit } = nftFetchTasks[j];
+          const nftResult = nftResults[j];
+          const hasNFT = nftResult.status === 'fulfilled' ? (nftResult.value as boolean) : false;
+
+          allDeposits.push({
+            amount: deposit[0],
+            originalAmount: deposit[1],
+            share: deposit[2],
+            rewardDebt: deposit[3],
+            depositTimestamp: deposit[4],
+            unlockTimestamp: deposit[5],
+            penaltyBps: deposit[6],
+            withdrawn: deposit[7],
+            depositId: depositIndex,
+            tokenSymbol: info.symbol,
+            hodlockAddress: info.hodlockAddress,
+            hasNFT,
+            decimals: info.decimals,
+          });
+        }
+
+        // Add small delay between batches to avoid rate limiting
+        if (i + batchSize < depositFetchTasks.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
+
+      setDeposits(allDeposits);
+    } catch (error) {
+      console.error('Error fetching deposits:', error);
+    } finally {
+      setLoading(false);
     }
-
-    setDeposits(allDeposits);
-    setLoading(false);
   }, [address, publicClient, tokenList]);
 
+  // Only fetch when tokenList actually changes (not on every render)
   useEffect(() => {
-    fetchDeposits();
-  }, [fetchDeposits]);
+    const tokenListKey = tokenList.map(t => t.hodlockAddress).join(',');
 
+    if (tokenList.length > 0 && tokenListKey !== lastTokenListRef.current) {
+      lastTokenListRef.current = tokenListKey;
+      fetchedRef.current = false;
+    }
+
+    if (tokenList.length > 0 && !fetchedRef.current) {
+      fetchedRef.current = true;
+      fetchDeposits();
+    }
+  }, [tokenList, fetchDeposits]);
+
+  // Refetch when transaction succeeds
   useEffect(() => {
     if (isSuccess) {
+      fetchedRef.current = false;
       fetchDeposits();
     }
   }, [isSuccess, fetchDeposits]);
