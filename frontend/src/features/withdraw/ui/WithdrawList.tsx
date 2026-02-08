@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { Address } from 'viem';
 import { motion } from 'framer-motion';
@@ -13,7 +13,7 @@ import {
   CardContent,
 } from '@/shared/ui';
 import { HODLOCK_ABI } from '@/shared/config/abi';
-import { TOKEN_INFO } from '@/shared/config/contracts';
+import { useAllHodlocks } from '@/shared/hooks';
 import { formatAmount, formatDaysRemaining, formatDate, cn } from '@/shared/lib/utils';
 
 interface DepositInfo {
@@ -32,6 +32,7 @@ interface DepositWithMeta extends DepositInfo {
   tokenSymbol: string;
   hodlockAddress: Address;
   hasNFT: boolean;
+  decimals: number;
 }
 
 export function WithdrawList() {
@@ -42,66 +43,128 @@ export function WithdrawList() {
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
   const publicClient = usePublicClient();
 
+  // Use dynamically fetched Hodlock list from factory
+  const { tokenList, isLoading: isLoadingTokens } = useAllHodlocks();
+
   const fetchDeposits = useCallback(async () => {
-    if (!address || !publicClient) return;
+    if (!address || !publicClient || tokenList.length === 0) return;
 
     setLoading(true);
     const allDeposits: DepositWithMeta[] = [];
 
-    for (const [symbol, info] of Object.entries(TOKEN_INFO)) {
-      try {
-        const count = await publicClient.readContract({
+    // First, get deposit counts for all tokens in parallel
+    const countResults = await Promise.allSettled(
+      tokenList.map(info =>
+        publicClient.readContract({
           address: info.hodlockAddress,
           abi: HODLOCK_ABI,
           functionName: 'getDepositCount',
           args: [address as Address],
-        }) as bigint;
+        })
+      )
+    );
 
-        for (let i = 0; i < Number(count); i++) {
-          try {
-            const deposit = await publicClient.readContract({
-              address: info.hodlockAddress,
-              abi: HODLOCK_ABI,
-              functionName: 'userDeposits',
-              args: [address as Address, BigInt(i)],
-            }) as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, boolean];
+    // Build list of deposit fetch tasks
+    const depositFetchTasks: Array<{
+      info: typeof tokenList[0];
+      depositIndex: number;
+    }> = [];
 
-            if (!deposit[7]) {
-              // Check if this deposit has minted NFT
-              const hasNFT = await publicClient.readContract({
-                address: info.hodlockAddress,
-                abi: HODLOCK_ABI,
-                functionName: 'hasNFT',
-                args: [address as Address, BigInt(i)],
-              }) as boolean;
+    for (let i = 0; i < countResults.length; i++) {
+      const result = countResults[i];
+      if (result.status === 'fulfilled') {
+        const count = Number(result.value);
+        const info = tokenList[i];
+        for (let j = 0; j < count; j++) {
+          depositFetchTasks.push({ info, depositIndex: j });
+        }
+      }
+    }
 
-              allDeposits.push({
-                amount: deposit[0],
-                originalAmount: deposit[1],
-                share: deposit[2],
-                rewardDebt: deposit[3],
-                depositTimestamp: deposit[4],
-                unlockTimestamp: deposit[5],
-                penaltyBps: deposit[6],
-                withdrawn: deposit[7],
-                depositId: i,
-                tokenSymbol: symbol,
-                hodlockAddress: info.hodlockAddress,
-                hasNFT,
-              });
-            }
-          } catch (e) {
-            console.error(`Error fetching deposit ${i} for ${symbol}:`, e);
+    // Fetch all deposits in parallel (with batching to avoid rate limits)
+    const batchSize = 10;
+    for (let i = 0; i < depositFetchTasks.length; i += batchSize) {
+      const batch = depositFetchTasks.slice(i, i + batchSize);
+
+      const depositResults = await Promise.allSettled(
+        batch.map(({ info, depositIndex }) =>
+          publicClient.readContract({
+            address: info.hodlockAddress,
+            abi: HODLOCK_ABI,
+            functionName: 'userDeposits',
+            args: [address as Address, BigInt(depositIndex)],
+          })
+        )
+      );
+
+      // Fetch NFT status for non-withdrawn deposits
+      const nftFetchTasks: Array<{
+        batchIndex: number;
+        info: typeof tokenList[0];
+        depositIndex: number;
+        deposit: any;
+      }> = [];
+
+      for (let j = 0; j < depositResults.length; j++) {
+        const result = depositResults[j];
+        if (result.status === 'fulfilled') {
+          const deposit = result.value as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, boolean];
+          if (!deposit[7]) {
+            // Not withdrawn, check NFT status
+            nftFetchTasks.push({
+              batchIndex: j,
+              info: batch[j].info,
+              depositIndex: batch[j].depositIndex,
+              deposit,
+            });
           }
         }
-      } catch (e) {
-        console.error(`Error fetching deposit count for ${symbol}:`, e);
+      }
+
+      // Fetch NFT statuses in parallel
+      const nftResults = await Promise.allSettled(
+        nftFetchTasks.map(({ info, depositIndex }) =>
+          publicClient.readContract({
+            address: info.hodlockAddress,
+            abi: HODLOCK_ABI,
+            functionName: 'hasNFT',
+            args: [address as Address, BigInt(depositIndex)],
+          })
+        )
+      );
+
+      // Add deposits to results
+      for (let j = 0; j < nftFetchTasks.length; j++) {
+        const { info, depositIndex, deposit } = nftFetchTasks[j];
+        const nftResult = nftResults[j];
+        const hasNFT = nftResult.status === 'fulfilled' ? (nftResult.value as boolean) : false;
+
+        allDeposits.push({
+          amount: deposit[0],
+          originalAmount: deposit[1],
+          share: deposit[2],
+          rewardDebt: deposit[3],
+          depositTimestamp: deposit[4],
+          unlockTimestamp: deposit[5],
+          penaltyBps: deposit[6],
+          withdrawn: deposit[7],
+          depositId: depositIndex,
+          tokenSymbol: info.symbol,
+          hodlockAddress: info.hodlockAddress,
+          hasNFT,
+          decimals: info.decimals,
+        });
+      }
+
+      // Add small delay between batches to avoid rate limiting
+      if (i + batchSize < depositFetchTasks.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
 
     setDeposits(allDeposits);
     setLoading(false);
-  }, [address, publicClient]);
+  }, [address, publicClient, tokenList]);
 
   useEffect(() => {
     fetchDeposits();
@@ -180,7 +243,6 @@ export function WithdrawList() {
   return (
     <div className="space-y-6">
       {deposits.map((deposit, index) => {
-        const tokenInfo = TOKEN_INFO[deposit.tokenSymbol];
         const now = Math.floor(Date.now() / 1000);
         const isUnlocked = now >= Number(deposit.unlockTimestamp);
         const canEarlyWithdraw = Number(deposit.penaltyBps) < 10000;
@@ -212,7 +274,7 @@ export function WithdrawList() {
                     )}
                     <div>
                       <h3 className="font-semibold text-gray-900">
-                        {formatAmount(deposit.amount, tokenInfo.decimals)} {deposit.tokenSymbol}
+                        {formatAmount(deposit.amount, deposit.decimals)} {deposit.tokenSymbol}
                       </h3>
                       <p className="text-sm text-gray-500">
                         Deposited {formatDate(Number(deposit.depositTimestamp))}

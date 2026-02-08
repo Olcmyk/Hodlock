@@ -23,7 +23,7 @@ export interface UseAllHodlocksResult {
 }
 
 export function useAllHodlocks(): UseAllHodlocksResult {
-  // 1. Get total Hodlock contract count
+  // 1. Get total Hodlock contract count from factory
   const { data: hodlocksLength, refetch: refetchLength } = useReadContract({
     address: CONTRACTS.HodlockFactory,
     abi: FACTORY_ABI,
@@ -32,7 +32,11 @@ export function useAllHodlocks(): UseAllHodlocksResult {
 
   const length = hodlocksLength ? Number(hodlocksLength) : 0;
 
-  // 2. Get all Hodlock contract addresses
+  if (typeof window !== 'undefined') {
+    console.log('[useAllHodlocks] Factory has', length, 'Hodlock contracts');
+  }
+
+  // 2. Get all Hodlock contract addresses from factory
   const hodlockAddressesResult = useReadContracts({
     contracts: Array.from({ length }, (_, i) => ({
       address: CONTRACTS.HodlockFactory,
@@ -47,6 +51,10 @@ export function useAllHodlocks(): UseAllHodlocksResult {
     .map((r) => r.result as Address | undefined)
     .filter((addr): addr is Address => !!addr);
 
+  if (typeof window !== 'undefined') {
+    console.log('[useAllHodlocks] Hodlock addresses from factory:', hodlockAddresses);
+  }
+
   // 3. Get token address for each Hodlock contract
   const tokenAddressesResult = useReadContracts({
     contracts: hodlockAddresses.map((addr) => ({
@@ -60,6 +68,10 @@ export function useAllHodlocks(): UseAllHodlocksResult {
   const tokenAddresses = (tokenAddressesResult.data || [])
     .map((r) => r.result as Address | undefined)
     .filter((addr): addr is Address => !!addr);
+
+  if (typeof window !== 'undefined') {
+    console.log('[useAllHodlocks] Token addresses from Hodlock contracts:', tokenAddresses);
+  }
 
   // 4. Get symbol, name, decimals for each token
   const tokenInfoResult = useReadContracts({
@@ -78,9 +90,13 @@ export function useAllHodlocks(): UseAllHodlocksResult {
   if (tokenInfoResult.data && tokenAddresses.length > 0) {
     for (let i = 0; i < tokenAddresses.length; i++) {
       const tokenAddress = tokenAddresses[i];
+      const hodlockAddress = hodlockAddresses[i];
 
-      // Only add whitelisted tokens
+      // Check if token is whitelisted
       if (!isTokenWhitelisted(tokenAddress)) {
+        if (typeof window !== 'undefined') {
+          console.warn('[useAllHodlocks] Token not in whitelist, skipping:', tokenAddress);
+        }
         continue;
       }
 
@@ -97,14 +113,26 @@ export function useAllHodlocks(): UseAllHodlocksResult {
           symbol,
           name,
           decimals,
-          hodlockAddress: hodlockAddresses[i],
-          tokenAddress: tokenAddresses[i],
+          hodlockAddress,
+          tokenAddress,
         };
 
         tokens[symbol] = info;
         tokenList.push(info);
+
+        if (typeof window !== 'undefined') {
+          console.log('[useAllHodlocks] Added token:', symbol, {
+            hodlockAddress,
+            tokenAddress,
+            decimals,
+          });
+        }
       }
     }
+  }
+
+  if (typeof window !== 'undefined') {
+    console.log('[useAllHodlocks] Final result - tokenList:', tokenList.length, 'tokens');
   }
 
   const isLoading =
